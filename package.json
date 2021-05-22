@@ -1,0 +1,19 @@
+{
+  "name": "thefloorislava",
+  "version": "0.1.0",
+  "description": "",
+  "main": "build.js",
+  "directories": {
+    "lib": "lib"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "TheHorscht <realhorscht+github@gmail.com> (https://github.com/TheHorscht)",
+  "license": "ISC",
+  "dependencies": {
+    "adm-zip": "^0.4.14",
+    "minimatch": "^3.0.4",
+    "xml2js": "^0.4.23"
+  }
+}

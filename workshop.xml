@@ -1,0 +1,8 @@
+<Mod
+	name="Wand storage"
+	description=""
+	tags="gameplay,tweaks"
+	dont_upload_folders="node_modules|dist|gimp|fmod"
+	dont_upload_files=".gitignore|build.js|lua51.dll|luajit.exe|LICENSE|modworkshop description.md|modworkshop_banner.png|modworkshop_cover.png|package-lock.json|package.json|TODO.md"
+> 
+</Mod>
