@@ -1,6 +1,10 @@
 dofile_once("data/scripts/lib/utilities.lua")
 local nxml = dofile_once("mods/WandStorage/lib/nxml.lua")
 
+local function ends_with(str, ending)
+  return ending == "" or str:sub(-#ending) == ending
+end
+
 function get_active_item()
 	local player = EntityGetWithTag("player_unit")[1]
 	if player then
@@ -40,6 +44,9 @@ function get_held_wands()
 			if is_wand(wand) then
 				local sprite_component = EntityGetFirstComponentIncludingDisabled(wand, "SpriteComponent")
 				local image_file = ComponentGetValue2(sprite_component, "image_file")
+				if ends_with(image_file, ".xml") then
+					image_file = get_wand_xml_sprite(image_file)
+				end
 				table.insert(wands, {
 					entity_id = wand,
 					image_file = image_file,
@@ -60,6 +67,9 @@ function get_stored_wands()
 		for i, wand in ipairs(wands) do
 			local sprite_component = EntityGetFirstComponentIncludingDisabled(wand, "SpriteComponent")
 			local image_file = ComponentGetValue2(sprite_component, "image_file")
+			if ends_with(image_file, ".xml") then
+				image_file = get_wand_xml_sprite(image_file)
+			end
 			wands[i] = {
 				entity_id = wand,
 				image_file = image_file
@@ -122,13 +132,9 @@ function get_first_free_wand_slot()
 	end
 end
 
-local function ends_with(str, ending)
-  return ending == "" or str:sub(-#ending) == ending
-end
-
 local sprite_xml_path_cache = {}
 local _ModTextFileGetContent = ModTextFileGetContent
-local function get_wand_xml_sprite(sprite_xml_path)
+function get_wand_xml_sprite(sprite_xml_path)
 	if sprite_xml_path_cache[sprite_xml_path] then
 		return sprite_xml_path_cache[sprite_xml_path]
 	end
@@ -154,35 +160,41 @@ function OnWorldPreUpdate()
 		return current_id
 	end
 	GuiStartFrame(gui)
+	local screen_width, screen_height = GuiGetScreenDimensions(gui)
 	GuiOptionsAdd(gui, GUI_OPTION.NoPositionTween)
 	if GuiButton(gui, new_id(), 0, 0, "X") then
 		open = not open
 	end
 	if open then
-		GuiBeginAutoBox(gui)
+		local slot_width, slot_height = 16, 16
+		local box_width, box_height = 100, 100
 		GuiLayoutBeginVertical(gui, 50, 50)
+		GuiText(gui, -box_width/2, -box_height/2, "")
 		GuiLayoutBeginHorizontal(gui, 0, 0)
+		GuiZSetForNextWidget(gui, 20)
+		GuiImageNinePiece(gui, new_id(), (screen_width - box_width) / 2, (screen_height - box_height) / 2, box_width, box_height, 1, "mods/WandStorage/files/container_9piece.png", "mods/WandStorage/files/container_9piece.png")
+		-- Offset the layouting position
+		GuiText(gui, -box_width/2, -box_height/2, "")
 		local held_wands = get_held_wands()
-		for i, wand in ipairs(held_wands) do
-			-- GuiGetPreviousWidgetInfo( gui:obj ) -> clicked:bool, right_clicked:bool, hovered:bool, x:number, y:number, width:number, height:number, draw_x:number, draw_y:number, draw_width:number, draw_height:number [Returns the final position, size etc calculated for a widget. Some values aren't supported by all widgets.]
-			-- if GuiImageButton(gui, new_id(), 0, 0, "", wand.image_file) then
-			if GuiImageButton(gui, new_id(), 0, 0, "", "data/ui_gfx/inventory/inventory_box.png") then
-				put_wand_in_storage(wand.entity_id)
+		for i=1, 4 do
+			local wand = held_wands[i]
+			if wand then
+				if GuiImageButton(gui, new_id(), 0, 0, "", "data/ui_gfx/inventory/inventory_box.png") then
+					put_wand_in_storage(wand.entity_id)
+				end
+				local _, _, _, x, y, width, height = GuiGetPreviousWidgetInfo(gui)
+				local w, h = GuiGetImageDimensions(gui, wand.image_file, 1) -- scale
+				GuiOptionsAddForNextWidget(gui, GUI_OPTION.Layout_NoLayouting)
+				GuiZSetForNextWidget(gui, -10)
+				GuiImage(gui, new_id(), x + (width / 2 - w / 2), y + (height / 2 - h / 2), wand.image_file, 1, 1, 1, 0, GUI_RECT_ANIMATION_PLAYBACK.Loop)
+			else
+				GuiImage(gui, new_id(), 0, 0, "data/ui_gfx/inventory/inventory_box.png", 1, 1, 1)
 			end
-			local _, _, _, x, y, width, height = GuiGetPreviousWidgetInfo(gui)
-			local w, h = GuiGetImageDimensions(gui, wand.image_file, 1) -- scale
-			if ends_with(wand.image_file, ".xml") then
-				wand.image_file = get_wand_xml_sprite(wand.image_file)
-			end
-			GuiOptionsAddForNextWidget(gui, GUI_OPTION.Layout_NoLayouting)
-			GuiZSetForNextWidget(gui, -10)
-			-- GuiImage(gui, new_id(), -width, 0, wand.image_file, 1, 1, 1, 0, GUI_RECT_ANIMATION_PLAYBACK.Loop)
-			-- GuiImage(gui, new_id(), -width + (width / 2 - w / 2), (height / 2 - h / 2), wand.image_file, 1, 1, 1, 0, GUI_RECT_ANIMATION_PLAYBACK.Loop)
-			GuiImage(gui, new_id(), x + (width / 2 - w / 2), y + (height / 2 - h / 2), wand.image_file, 1, 1, 1, 0, GUI_RECT_ANIMATION_PLAYBACK.Loop)
 		end
 		GuiLayoutEnd(gui)
-		GuiText(gui, 0, 0, "-----")
+		GuiText(gui, 0, 0, "")
 		GuiLayoutBeginHorizontal(gui, 0, 0)
+		GuiText(gui, -box_width/2, -box_height/2, "")
 		local wands = get_stored_wands()
 		for i, wand in ipairs(wands) do
 			if GuiImageButton(gui, new_id(), 0, 0, "", wand.image_file) then
@@ -193,7 +205,5 @@ function OnWorldPreUpdate()
 		end
 		GuiLayoutEnd(gui)
 		GuiLayoutEnd(gui)
-		GuiZSetForNextWidget(gui, 10)
-		GuiEndAutoBoxNinePiece(gui)
 	end
 end
