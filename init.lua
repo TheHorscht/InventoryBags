@@ -17,8 +17,8 @@ function get_active_item()
 	local player = EntityGetWithTag("player_unit")[1]
 	if player then
 		local inventory2 = EntityGetFirstComponentIncludingDisabled(player, "Inventory2Component")
-		local mActiveItem = ComponentGetValue2(inventory2, "mActualActiveItem")
-		return mActiveItem > 0 and mActiveItem or nil
+		local mActualActiveItem = ComponentGetValue2(inventory2, "mActualActiveItem")
+		return mActualActiveItem > 0 and mActualActiveItem or nil
 	end
 end
 
