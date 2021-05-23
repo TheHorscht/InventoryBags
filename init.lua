@@ -9,7 +9,7 @@ function get_active_item()
 	local player = EntityGetWithTag("player_unit")[1]
 	if player then
 		local inventory2 = EntityGetFirstComponentIncludingDisabled(player, "Inventory2Component")
-		local mActiveItem = ComponentGetValue2(inventory2, "mActiveItem")
+		local mActiveItem = ComponentGetValue2(inventory2, "mActualActiveItem")
 		return mActiveItem > 0 and mActiveItem or nil
 	end
 end
@@ -19,6 +19,7 @@ function set_active_item(wand)
 	if player then
 		local inventory2 = EntityGetFirstComponentIncludingDisabled(player, "Inventory2Component")
 		ComponentSetValue2(inventory2, "mActiveItem", wand)
+		ComponentSetValue2(inventory2, "mForceRefresh", true)
 	end
 end
 
@@ -39,6 +40,7 @@ end
 function get_held_wands()
 	local inventory = EntityGetWithName("inventory_quick")
 	if inventory > 0 then
+		local active_item = get_active_item()
 		local wands = {}
 		for i, wand in ipairs(EntityGetAllChildren(inventory) or {}) do
 			if is_wand(wand) then
@@ -50,7 +52,8 @@ function get_held_wands()
 				table.insert(wands, {
 					entity_id = wand,
 					image_file = image_file,
-					inventory_slot = get_inventory_position(wand)
+					inventory_slot = get_inventory_position(wand),
+					active = wand == active_item
 				})
 			end
 		end
@@ -83,6 +86,8 @@ end
 
 function put_wand_in_storage(wand)
 	local wand_storage = EntityGetWithName("wand_storage_container")
+	local num_wands_stored = #(EntityGetAllChildren(wand_storage) or {})
+	if num_wands_stored >= 16 then GamePrint("Wand bag is full") return end
 	local player = EntityGetWithTag("player_unit")[1]
 	if player and wand_storage > 0 then
 		local inventory2 = EntityGetFirstComponentIncludingDisabled(player, "Inventory2Component")
@@ -104,18 +109,22 @@ function retrieve_or_swap_wand(wand)
 	local inventory = EntityGetWithName("inventory_quick")
 	local wand_storage = EntityGetWithName("wand_storage_container")
 	if inventory > 0 and wand_storage > 0 then
-		EntityRemoveFromParent(wand)
 		local active_item = get_active_item()
 		local inventory_slot
-		if active_item and is_wand(active_item) then
+		if not has_enough_space_for_wand() and active_item and is_wand(active_item) then
 			-- Swap
 			inventory_slot = get_inventory_position(active_item)
 			EntityRemoveFromParent(active_item)
 			EntityAddChild(wand_storage, active_item)
 		end
-		EntityAddChild(inventory, wand)
-		set_active_item(wand)
-		set_inventory_position(wand, inventory_slot and inventory_slot or get_first_free_wand_slot())
+		local first_free_wand_slot = get_first_free_wand_slot()
+		-- Make sure we only pick up the wand if either we have a wand selected that we will swap with, or have enough space
+		if inventory_slot or first_free_wand_slot then
+			EntityRemoveFromParent(wand)
+			EntityAddChild(inventory, wand)
+			set_active_item(wand)
+			set_inventory_position(wand, inventory_slot and inventory_slot or first_free_wand_slot)
+		end
 	end
 end
 
@@ -151,6 +160,16 @@ function OnPlayerSpawned(player)
 	end
 end
 
+function is_inventory_open()
+	local player = EntityGetWithTag("player_unit")[1]
+	if player then
+		local inventory_gui_component = EntityGetFirstComponentIncludingDisabled(player, "InventoryGuiComponent")
+		if inventory_gui_component then
+			return ComponentGetValue2(inventory_gui_component, "mActive")
+		end
+	end
+end
+
 function OnWorldPreUpdate()
 	gui = gui or GuiCreate()
 	open = open or false
@@ -160,34 +179,43 @@ function OnWorldPreUpdate()
 		return current_id
 	end
 	GuiStartFrame(gui)
-	local screen_width, screen_height = GuiGetScreenDimensions(gui)
 	GuiOptionsAdd(gui, GUI_OPTION.NoPositionTween)
-	if GuiButton(gui, new_id(), 0, 0, "X") then
+	local inventory_open = is_inventory_open()
+	if not inventory_open and GuiImageButton(gui, new_id(), 2, 22, "", "mods/WandStorage/files/gui_button.png") then
 		open = not open
 	end
-	if open then
+	if open and not inventory_open then
 		local slot_width, slot_height = 16, 16
 		local slot_margin = 1
 		local slot_width_total, slot_height_total = (slot_width + slot_margin * 2), (slot_height + slot_margin * 2)
 		local spacer = 4
 		local box_width, box_height = slot_width_total * 4, slot_height_total * 5 + spacer
-		local origin_x, origin_y = (screen_width - box_width) / 2, (screen_height - box_height) / 2
+		local origin_x, origin_y = 23, 48
 		GuiZSetForNextWidget(gui, 20)
 		GuiImageNinePiece(gui, new_id(), origin_x, origin_y, box_width, box_height, 1, "mods/WandStorage/files/container_9piece.png", "mods/WandStorage/files/container_9piece.png")
 		local held_wands = get_held_wands()
-		for i=0, (4-1) do
-			local wand = held_wands[i+1]
+		local taken_slots = {}
+		-- Render the held wands and save the taken positions so we can render the empty slots after this
+		for i, wand in ipairs(held_wands) do
 			if wand then
-				if GuiImageButton(gui, new_id(), origin_x + slot_margin + i * slot_width_total, origin_y + slot_margin, "", "data/ui_gfx/inventory/inventory_box.png") then
+				taken_slots[wand.inventory_slot] = true
+				if GuiImageButton(gui, new_id(), origin_x + slot_margin + wand.inventory_slot * slot_width_total, origin_y + slot_margin, "", "data/ui_gfx/inventory/inventory_box.png") then
 					put_wand_in_storage(wand.entity_id)
 				end
 				local _, _, hovered, x, y, width, height = GuiGetPreviousWidgetInfo(gui)
 				local w, h = GuiGetImageDimensions(gui, wand.image_file, 1) -- scale
 				local scale = hovered and 1.2 or 1
+				GuiZSetForNextWidget(gui, -9)
+				if wand.active then
+					GuiImage(gui, new_id(), x + (width / 2 - (16 * scale) / 2), y + (height / 2 - (16 * scale) / 2), "mods/WandStorage/files/highlight_box.png", 1, scale, scale)
+				end
 				GuiZSetForNextWidget(gui, -10)
 				GuiImage(gui, new_id(), x + (width / 2 - (w * scale) / 2), y + (height / 2 - (h * scale) / 2), wand.image_file, 1, scale, scale, 0, GUI_RECT_ANIMATION_PLAYBACK.Loop)
-			else
-				GuiImage(gui, new_id(), origin_x + slot_margin +  i * slot_width_total, origin_y + slot_margin, "data/ui_gfx/inventory/inventory_box.png", 1, 1, 1)
+			end
+		end
+		for i=0, (4-1) do
+			if not taken_slots[i] then
+				GuiImage(gui, new_id(), origin_x + slot_margin + i * slot_width_total, origin_y + slot_margin, "data/ui_gfx/inventory/inventory_box.png", 1, 1, 1)
 			end
 		end
 		local stored_wands = get_stored_wands()
@@ -196,9 +224,7 @@ function OnWorldPreUpdate()
 				local wand = stored_wands[(iy*4 + ix) + 1]
 				if wand then
 					if GuiImageButton(gui, new_id(), origin_x + slot_margin + ix * slot_width_total, origin_y + spacer + slot_margin + slot_height_total + iy * slot_height_total, "", "data/ui_gfx/inventory/inventory_box.png") then
-						if has_enough_space_for_wand() then
-							retrieve_or_swap_wand(wand.entity_id)
-						end
+						retrieve_or_swap_wand(wand.entity_id)
 					end
 					local _, _, hovered, x, y, width, height = GuiGetPreviousWidgetInfo(gui)
 					local w, h = GuiGetImageDimensions(gui, wand.image_file, 1) -- scale
@@ -210,14 +236,5 @@ function OnWorldPreUpdate()
 				end
 			end
 		end
-
-		-- for i, wand in ipairs(wands) do
-		-- 	if GuiImageButton(gui, new_id(), origin_x + x, origin_y + slot_height_total * 2, "", wand.image_file) then
-		-- 		if has_enough_space_for_wand() then
-		-- 			retrieve_or_swap_wand(wand.entity_id)
-		-- 		end
-		-- 	end
-		-- 	x = x + slot_width_total
-		-- end
 	end
 end
