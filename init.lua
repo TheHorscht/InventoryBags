@@ -4,6 +4,8 @@ dofile_once("data/scripts/gun/gun_actions.lua")
 local nxml = dofile_once("mods/WandStorage/lib/nxml.lua")
 local EZWand = dofile_once("mods/WandStorage/lib/EZWand.lua")
 
+local rows = 4
+
 local spell_icon_lookup = {}
 for i, action in ipairs(actions) do
 	spell_icon_lookup[action.id] = action.sprite
@@ -95,7 +97,7 @@ end
 function put_wand_in_storage(wand)
 	local wand_storage = EntityGetWithName("wand_storage_container")
 	local num_wands_stored = #(EntityGetAllChildren(wand_storage) or {})
-	if num_wands_stored >= 16 then GamePrint("Wand bag is full") return end
+	if num_wands_stored >= rows * 4 then GamePrint("Wand bag is full") return end
 	local player = EntityGetWithTag("player_unit")[1]
 	if player and wand_storage > 0 then
 		local inventory2 = EntityGetFirstComponentIncludingDisabled(player, "Inventory2Component")
@@ -197,7 +199,7 @@ function OnWorldPreUpdate()
 		local slot_margin = 1
 		local slot_width_total, slot_height_total = (slot_width + slot_margin * 2), (slot_height + slot_margin * 2)
 		local spacer = 4
-		local box_width, box_height = slot_width_total * 4, slot_height_total * 5 + spacer
+		local box_width, box_height = slot_width_total * 4, slot_height_total * (rows+1) + spacer
 		local origin_x, origin_y = 23, 48
 		GuiZSetForNextWidget(gui, 20)
 		GuiImageNinePiece(gui, new_id(), origin_x, origin_y, box_width, box_height, 1, "mods/WandStorage/files/container_9piece.png", "mods/WandStorage/files/container_9piece.png")
@@ -231,7 +233,7 @@ function OnWorldPreUpdate()
 			end
 		end
 		local stored_wands = get_stored_wands()
-		for iy=0, (4-1) do
+		for iy=0, (rows-1) do
 			for ix=0, (4-1) do
 				local wand = stored_wands[(iy*4 + ix) + 1]
 				if wand then
