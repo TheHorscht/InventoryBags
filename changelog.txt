@@ -1,2 +1,5 @@
+v0.1.1:
+- Fixed wrong path after renaming the mod from WandStorage to WandBag.
+
 v0.1.0:
 - First release

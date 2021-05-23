@@ -1,8 +1,8 @@
 dofile_once("data/scripts/lib/utilities.lua")
 dofile_once("data/scripts/lib/utilities.lua")
 dofile_once("data/scripts/gun/gun_actions.lua")
-local nxml = dofile_once("mods/WandStorage/lib/nxml.lua")
-local EZWand = dofile_once("mods/WandStorage/lib/EZWand.lua")
+local nxml = dofile_once("mods/WandBag/lib/nxml.lua")
+local EZWand = dofile_once("mods/WandBag/lib/EZWand.lua")
 
 local rows = 4
 
@@ -191,7 +191,7 @@ function OnWorldPreUpdate()
 	GuiStartFrame(gui)
 	GuiOptionsAdd(gui, GUI_OPTION.NoPositionTween)
 	local inventory_open = is_inventory_open()
-	if not inventory_open and GuiImageButton(gui, new_id(), 2, 22, "", "mods/WandStorage/files/gui_button.png") then
+	if not inventory_open and GuiImageButton(gui, new_id(), 2, 22, "", "mods/WandBag/files/gui_button.png") then
 		open = not open
 	end
 	if open and not inventory_open then
@@ -202,7 +202,7 @@ function OnWorldPreUpdate()
 		local box_width, box_height = slot_width_total * 4, slot_height_total * (rows+1) + spacer
 		local origin_x, origin_y = 23, 48
 		GuiZSetForNextWidget(gui, 20)
-		GuiImageNinePiece(gui, new_id(), origin_x, origin_y, box_width, box_height, 1, "mods/WandStorage/files/container_9piece.png", "mods/WandStorage/files/container_9piece.png")
+		GuiImageNinePiece(gui, new_id(), origin_x, origin_y, box_width, box_height, 1, "mods/WandBag/files/container_9piece.png", "mods/WandBag/files/container_9piece.png")
 		local tooltip_wand
 		local held_wands = get_held_wands()
 		local taken_slots = {}
@@ -221,7 +221,7 @@ function OnWorldPreUpdate()
 				end
 				GuiZSetForNextWidget(gui, -9)
 				if wand.active then
-					GuiImage(gui, new_id(), x + (width / 2 - (16 * scale) / 2), y + (height / 2 - (16 * scale) / 2), "mods/WandStorage/files/highlight_box.png", 1, scale, scale)
+					GuiImage(gui, new_id(), x + (width / 2 - (16 * scale) / 2), y + (height / 2 - (16 * scale) / 2), "mods/WandBag/files/highlight_box.png", 1, scale, scale)
 				end
 				GuiZSetForNextWidget(gui, -10)
 				GuiImage(gui, new_id(), x + (width / 2 - (w * scale) / 2), y + (height / 2 - (h * scale) / 2), wand.image_file, 1, scale, scale, 0, GUI_RECT_ANIMATION_PLAYBACK.Loop)
