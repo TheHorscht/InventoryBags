@@ -167,43 +167,57 @@ function OnWorldPreUpdate()
 	end
 	if open then
 		local slot_width, slot_height = 16, 16
-		local box_width, box_height = 100, 100
-		GuiLayoutBeginVertical(gui, 50, 50)
-		GuiText(gui, -box_width/2, -box_height/2, "")
-		GuiLayoutBeginHorizontal(gui, 0, 0)
+		local slot_margin = 1
+		local slot_width_total, slot_height_total = (slot_width + slot_margin * 2), (slot_height + slot_margin * 2)
+		local spacer = 4
+		local box_width, box_height = slot_width_total * 4, slot_height_total * 5 + spacer
+		local origin_x, origin_y = (screen_width - box_width) / 2, (screen_height - box_height) / 2
 		GuiZSetForNextWidget(gui, 20)
-		GuiImageNinePiece(gui, new_id(), (screen_width - box_width) / 2, (screen_height - box_height) / 2, box_width, box_height, 1, "mods/WandStorage/files/container_9piece.png", "mods/WandStorage/files/container_9piece.png")
-		-- Offset the layouting position
-		GuiText(gui, -box_width/2, -box_height/2, "")
+		GuiImageNinePiece(gui, new_id(), origin_x, origin_y, box_width, box_height, 1, "mods/WandStorage/files/container_9piece.png", "mods/WandStorage/files/container_9piece.png")
 		local held_wands = get_held_wands()
-		for i=1, 4 do
-			local wand = held_wands[i]
+		for i=0, (4-1) do
+			local wand = held_wands[i+1]
 			if wand then
-				if GuiImageButton(gui, new_id(), 0, 0, "", "data/ui_gfx/inventory/inventory_box.png") then
+				if GuiImageButton(gui, new_id(), origin_x + slot_margin + i * slot_width_total, origin_y + slot_margin, "", "data/ui_gfx/inventory/inventory_box.png") then
 					put_wand_in_storage(wand.entity_id)
 				end
-				local _, _, _, x, y, width, height = GuiGetPreviousWidgetInfo(gui)
+				local _, _, hovered, x, y, width, height = GuiGetPreviousWidgetInfo(gui)
 				local w, h = GuiGetImageDimensions(gui, wand.image_file, 1) -- scale
-				GuiOptionsAddForNextWidget(gui, GUI_OPTION.Layout_NoLayouting)
+				local scale = hovered and 1.2 or 1
 				GuiZSetForNextWidget(gui, -10)
-				GuiImage(gui, new_id(), x + (width / 2 - w / 2), y + (height / 2 - h / 2), wand.image_file, 1, 1, 1, 0, GUI_RECT_ANIMATION_PLAYBACK.Loop)
+				GuiImage(gui, new_id(), x + (width / 2 - (w * scale) / 2), y + (height / 2 - (h * scale) / 2), wand.image_file, 1, scale, scale, 0, GUI_RECT_ANIMATION_PLAYBACK.Loop)
 			else
-				GuiImage(gui, new_id(), 0, 0, "data/ui_gfx/inventory/inventory_box.png", 1, 1, 1)
+				GuiImage(gui, new_id(), origin_x + slot_margin +  i * slot_width_total, origin_y + slot_margin, "data/ui_gfx/inventory/inventory_box.png", 1, 1, 1)
 			end
 		end
-		GuiLayoutEnd(gui)
-		GuiText(gui, 0, 0, "")
-		GuiLayoutBeginHorizontal(gui, 0, 0)
-		GuiText(gui, -box_width/2, -box_height/2, "")
-		local wands = get_stored_wands()
-		for i, wand in ipairs(wands) do
-			if GuiImageButton(gui, new_id(), 0, 0, "", wand.image_file) then
-				if has_enough_space_for_wand() then
-					retrieve_or_swap_wand(wand.entity_id)
+		local stored_wands = get_stored_wands()
+		for iy=0, (4-1) do
+			for ix=0, (4-1) do
+				local wand = stored_wands[(iy*4 + ix) + 1]
+				if wand then
+					if GuiImageButton(gui, new_id(), origin_x + slot_margin + ix * slot_width_total, origin_y + spacer + slot_margin + slot_height_total + iy * slot_height_total, "", "data/ui_gfx/inventory/inventory_box.png") then
+						if has_enough_space_for_wand() then
+							retrieve_or_swap_wand(wand.entity_id)
+						end
+					end
+					local _, _, hovered, x, y, width, height = GuiGetPreviousWidgetInfo(gui)
+					local w, h = GuiGetImageDimensions(gui, wand.image_file, 1) -- scale
+					local scale = hovered and 1.2 or 1
+					GuiZSetForNextWidget(gui, -10)
+					GuiImage(gui, new_id(), x + (width / 2 - (w * scale) / 2), y + (height / 2 - (h *scale) / 2), wand.image_file, 1, scale, scale, 0, GUI_RECT_ANIMATION_PLAYBACK.Loop)
+				else
+					GuiImage(gui, new_id(), origin_x + slot_margin + ix * slot_width_total, origin_y + spacer + slot_margin + slot_height_total + iy * slot_height_total, "data/ui_gfx/inventory/inventory_box.png", 1, 1, 1)
 				end
 			end
 		end
-		GuiLayoutEnd(gui)
-		GuiLayoutEnd(gui)
+
+		-- for i, wand in ipairs(wands) do
+		-- 	if GuiImageButton(gui, new_id(), origin_x + x, origin_y + slot_height_total * 2, "", wand.image_file) then
+		-- 		if has_enough_space_for_wand() then
+		-- 			retrieve_or_swap_wand(wand.entity_id)
+		-- 		end
+		-- 	end
+		-- 	x = x + slot_width_total
+		-- end
 	end
 end
