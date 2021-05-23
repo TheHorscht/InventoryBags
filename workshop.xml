@@ -1,8 +1,8 @@
 <Mod
-	name="Wand storage"
-	description=""
-	tags="gameplay,tweaks"
+	name="Wand Bag"
+	description="Lets you carry more wands by stowing them away in a bag"
+	tags="tweaks,quality of life"
 	dont_upload_folders="node_modules|dist|gimp|fmod"
-	dont_upload_files=".gitignore|build.js|lua51.dll|luajit.exe|LICENSE|modworkshop description.md|modworkshop_banner.png|modworkshop_cover.png|package-lock.json|package.json|TODO.md"
+	dont_upload_files=".gitignore|build.js|LICENSE|modworkshop description.md|modworkshop_banner.png|modworkshop_cover.png|package-lock.json|package.json|TODO.md|workshop_preview_image.psd"
 > 
 </Mod>

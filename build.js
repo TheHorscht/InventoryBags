@@ -18,11 +18,12 @@ args.forEach(val => {
 
 // Config
 const out_dir = __dirname + '/dist';
-const name = 'TheFloorIsLava';
-const version = pjson.version; //'1.1.3';
+const name = pjson.name;
+const version = pjson.version;
 const root_folder = __dirname;
 const ignore_list = [
   '.git',
+  '.gitignore',
   'workshop.xml',
   'workshop_id.txt',
   'workshop_preview_image.png',

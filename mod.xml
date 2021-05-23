@@ -1,6 +1,6 @@
 <Mod
-	name="Wand storage"
-	description=""
+	name="Wand Bag"
+	description="Lets you carry more wands by stowing them away in a bag"
 	request_no_api_restrictions="0" 
 > 
 </Mod>
