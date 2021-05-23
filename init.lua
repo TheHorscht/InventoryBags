@@ -1,5 +1,13 @@
 dofile_once("data/scripts/lib/utilities.lua")
+dofile_once("data/scripts/lib/utilities.lua")
+dofile_once("data/scripts/gun/gun_actions.lua")
 local nxml = dofile_once("mods/WandStorage/lib/nxml.lua")
+local EZWand = dofile_once("mods/WandStorage/lib/EZWand.lua")
+
+local spell_icon_lookup = {}
+for i, action in ipairs(actions) do
+	spell_icon_lookup[action.id] = action.sprite
+end
 
 local function ends_with(str, ending)
   return ending == "" or str:sub(-#ending) == ending
@@ -193,6 +201,7 @@ function OnWorldPreUpdate()
 		local origin_x, origin_y = 23, 48
 		GuiZSetForNextWidget(gui, 20)
 		GuiImageNinePiece(gui, new_id(), origin_x, origin_y, box_width, box_height, 1, "mods/WandStorage/files/container_9piece.png", "mods/WandStorage/files/container_9piece.png")
+		local tooltip_wand
 		local held_wands = get_held_wands()
 		local taken_slots = {}
 		-- Render the held wands and save the taken positions so we can render the empty slots after this
@@ -205,6 +214,9 @@ function OnWorldPreUpdate()
 				local _, _, hovered, x, y, width, height = GuiGetPreviousWidgetInfo(gui)
 				local w, h = GuiGetImageDimensions(gui, wand.image_file, 1) -- scale
 				local scale = hovered and 1.2 or 1
+				if hovered then
+					tooltip_wand = wand.entity_id
+				end
 				GuiZSetForNextWidget(gui, -9)
 				if wand.active then
 					GuiImage(gui, new_id(), x + (width / 2 - (16 * scale) / 2), y + (height / 2 - (16 * scale) / 2), "mods/WandStorage/files/highlight_box.png", 1, scale, scale)
@@ -229,12 +241,81 @@ function OnWorldPreUpdate()
 					local _, _, hovered, x, y, width, height = GuiGetPreviousWidgetInfo(gui)
 					local w, h = GuiGetImageDimensions(gui, wand.image_file, 1) -- scale
 					local scale = hovered and 1.2 or 1
+					if hovered then
+						tooltip_wand = wand.entity_id
+					end
 					GuiZSetForNextWidget(gui, -10)
 					GuiImage(gui, new_id(), x + (width / 2 - (w * scale) / 2), y + (height / 2 - (h *scale) / 2), wand.image_file, 1, scale, scale, 0, GUI_RECT_ANIMATION_PLAYBACK.Loop)
 				else
 					GuiImage(gui, new_id(), origin_x + slot_margin + ix * slot_width_total, origin_y + spacer + slot_margin + slot_height_total + iy * slot_height_total, "data/ui_gfx/inventory/inventory_box.png", 1, 1, 1)
 				end
 			end
+		end
+		-- Render a tooltip of the hovered wand if we have any
+		if tooltip_wand then
+			local wand = EZWand(tooltip_wand)
+			local margin = -3
+			local wand_name = "WAND"
+			local _, _, _, spread_icon_x, spread_icon_y, spread_icon_width, spread_icon_height -- Saves the position and width of the spread icon so we can draw the spells below it
+			GuiBeginAutoBox(gui)
+			GuiLayoutBeginHorizontal(gui, origin_x + box_width + 20, origin_y + 5, true)
+			GuiLayoutBeginVertical(gui, 0, 0)
+			GuiText(gui, 0, 0, wand_name)
+			GuiImage(gui, new_id(), 0, 7, "data/ui_gfx/inventory/icon_gun_shuffle.png", 1, 1, 1)
+			GuiImage(gui, new_id(), 0, 1, "data/ui_gfx/inventory/icon_gun_actions_per_round.png", 1, 1, 1)
+			GuiImage(gui, new_id(), 0, 1, "data/ui_gfx/inventory/icon_fire_rate_wait.png", 1, 1, 1)
+			GuiImage(gui, new_id(), 0, 1, "data/ui_gfx/inventory/icon_gun_reload_time.png", 1, 1, 1)
+			GuiImage(gui, new_id(), 0, 1, "data/ui_gfx/inventory/icon_mana_max.png", 1, 1, 1)
+			GuiImage(gui, new_id(), 0, 1, "data/ui_gfx/inventory/icon_mana_charge_speed.png", 1, 1, 1)
+			GuiImage(gui, new_id(), 0, 1, "data/ui_gfx/inventory/icon_gun_capacity.png", 1, 1, 1)
+			GuiImage(gui, new_id(), 0, 1, "data/ui_gfx/inventory/icon_spread_degrees.png", 1, 1, 1)
+			_, _, _, spread_icon_x, spread_icon_y, spread_icon_width, spread_icon_height = GuiGetPreviousWidgetInfo(gui)
+			GuiLayoutEnd(gui)
+			local wand_name_width = GuiGetTextDimensions(gui, wand_name)
+			GuiLayoutBeginVertical(gui, 12 - wand_name_width, 0, true)
+			GuiText(gui, 0, 0, " ")
+			GuiText(gui, 0, 5, GameTextGetTranslatedOrNot("$inventory_shuffle"))
+			GuiText(gui, 0, margin, GameTextGetTranslatedOrNot("$inventory_actionspercast"))
+			GuiText(gui, 0, margin, GameTextGetTranslatedOrNot("$inventory_castdelay"))
+			GuiText(gui, 0, margin, GameTextGetTranslatedOrNot("$inventory_rechargetime"))
+			GuiText(gui, 0, margin, GameTextGetTranslatedOrNot("$inventory_manamax"))
+			GuiText(gui, 0, margin, GameTextGetTranslatedOrNot("$inventory_manachargespeed"))
+			GuiText(gui, 0, margin, GameTextGetTranslatedOrNot("$inventory_capacity"))
+			GuiText(gui, 0, margin, GameTextGetTranslatedOrNot("$inventory_spread"))
+			GuiLayoutEnd(gui)
+			GuiLayoutBeginVertical(gui, 0, 0, true)
+			GuiText(gui, 0, 0, " ")
+			GuiText(gui, 0, 5, GameTextGetTranslatedOrNot(wand.shuffle and "$menu_yes" or "$menu_no"))
+			GuiText(gui, 0, margin, string.format("%.0f", wand.spellsPerCast))
+			GuiText(gui, 0, margin, string.format("%.2f s", wand.castDelay / 60))
+			GuiText(gui, 0, margin, string.format("%.2f s", wand.rechargeTime / 60))
+			GuiText(gui, 0, margin, string.format("%.0f", wand.manaMax))
+			GuiText(gui, 0, margin, string.format("%.0f", wand.manaChargeSpeed))
+			GuiText(gui, 0, margin, string.format("%.0f", wand.capacity))
+			GuiText(gui, 0, margin, string.format("%.1f DEG", wand.spread))
+			GuiLayoutEnd(gui)
+			GuiLayoutEnd(gui)
+			local spells = wand:GetSpells()
+			GuiLayoutBeginHorizontal(gui, spread_icon_x, spread_icon_y + spread_icon_height + 3, true)
+			local row = 0
+			local spell_icon_scale = 0.75
+			for i, spell in ipairs(spells) do
+				GuiZSetForNextWidget(gui, 9)
+				GuiImage(gui, new_id(), 0, 0, "data/ui_gfx/inventory/inventory_box.png", 1, spell_icon_scale, spell_icon_scale)
+				local _, _, _, x, y = GuiGetPreviousWidgetInfo(gui)
+				GuiZSetForNextWidget(gui, 8)
+				GuiOptionsAddForNextWidget(gui, GUI_OPTION.Layout_NoLayouting)
+				GuiImage(gui, new_id(), x, y, spell_icon_lookup[spell.action_id], 1, spell_icon_scale, spell_icon_scale)
+				-- Start a new row after 10 spells
+				if i % 10 == 0 then
+					row = row + 1
+					GuiLayoutEnd(gui)
+					GuiLayoutBeginHorizontal(gui, spread_icon_x, spread_icon_y + spread_icon_height + 3 + row * 20 * spell_icon_scale, true)
+				end
+			end
+			GuiLayoutEnd(gui)
+			GuiZSetForNextWidget(gui, 10)
+			GuiEndAutoBoxNinePiece(gui)
 		end
 	end
 end
