@@ -1,3 +1,6 @@
+v0.1.2:
+- FIX: Should now work with most modded wands
+
 v0.1.1:
 - Fixed wrong path after renaming the mod from WandStorage to WandBag.
 

@@ -183,8 +183,8 @@ end
 
 -- Returns true if entity is a wand
 local function entity_is_wand(entity_id)
-	local comp = EntityGetComponentIncludingDisabled(entity_id, "ManaReloaderComponent")
-	return comp ~= nil
+	local ability_component = EntityGetFirstComponentIncludingDisabled(entity_id, "AbilityComponent")
+	return ComponentGetValue2(ability_component, "use_gun_script") == true
 end
 
 local function starts_with(str, start)

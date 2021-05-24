@@ -44,7 +44,8 @@ function set_inventory_position(entity, slot)
 end
 
 function is_wand(entity)
-	return EntityGetFirstComponentIncludingDisabled(entity, "ManaReloaderComponent")
+	local ability_component = EntityGetFirstComponentIncludingDisabled(entity, "AbilityComponent")
+	return ComponentGetValue2(ability_component, "use_gun_script") == true
 end
 
 function get_held_wands()
@@ -307,7 +308,7 @@ function OnWorldPreUpdate()
 				local _, _, _, x, y = GuiGetPreviousWidgetInfo(gui)
 				GuiZSetForNextWidget(gui, 8)
 				GuiOptionsAddForNextWidget(gui, GUI_OPTION.Layout_NoLayouting)
-				GuiImage(gui, new_id(), x, y, spell_icon_lookup[spell.action_id], 1, spell_icon_scale, spell_icon_scale)
+				GuiImage(gui, new_id(), x, y, spell_icon_lookup[spell.action_id] or "data/ui_gfx/gun_actions/unidentified.png", 1, spell_icon_scale, spell_icon_scale)
 				-- Start a new row after 10 spells
 				if i % 10 == 0 then
 					row = row + 1
