@@ -1,8 +1,11 @@
+v0.1.3:
+- FIX: Things got wonky when another entity with an inventory existed.
+
 v0.1.2:
-- FIX: Should now work with most modded wands
+- FIX: Should now work with most modded wands.
 
 v0.1.1:
-- Fixed wrong path after renaming the mod from WandStorage to WandBag.
+- FIX: Wrong path after renaming the mod from WandStorage to WandBag.
 
 v0.1.0:
-- First release
+- First release.

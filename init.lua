@@ -48,8 +48,19 @@ function is_wand(entity)
 	return ComponentGetValue2(ability_component, "use_gun_script") == true
 end
 
+function get_inventory()
+	local player = EntityGetWithTag("player_unit")[1]
+	if player then
+		for i, child in ipairs(EntityGetAllChildren(player) or {}) do
+			if EntityGetName(child) == "inventory_quick" then
+				return child
+			end
+		end
+	end
+end
+
 function get_held_wands()
-	local inventory = EntityGetWithName("inventory_quick")
+	local inventory = get_inventory()
 	if inventory > 0 then
 		local active_item = get_active_item()
 		local wands = {}
@@ -112,12 +123,12 @@ function put_wand_in_storage(wand)
 end
 
 function has_enough_space_for_wand()
-	local inventory = EntityGetWithName("inventory_quick")
+	local inventory = get_inventory()
 	return #get_held_wands() < 4
 end
 
 function retrieve_or_swap_wand(wand)
-	local inventory = EntityGetWithName("inventory_quick")
+	local inventory = get_inventory()
 	local wand_storage = EntityGetWithName("wand_storage_container")
 	if inventory > 0 and wand_storage > 0 then
 		local active_item = get_active_item()
