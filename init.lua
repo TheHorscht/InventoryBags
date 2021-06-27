@@ -192,6 +192,22 @@ function is_inventory_open()
 	end
 end
 
+button_pos_x = ModSettingGet("WandBag.pos_x")
+button_pos_y = ModSettingGet("WandBag.pos_y")
+button_locked = ModSettingGet("WandBag.locked")
+
+-- OnModSettingsChanged() seems to not work
+function OnPausedChanged(is_paused, is_inventory_pause)
+	if not button_locked and is_paused then
+		ModSettingSetNextValue("WandBag.pos_x", button_pos_x, false)
+		ModSettingSetNextValue("WandBag.pos_y", button_pos_y, false)
+	else
+		button_pos_x = ModSettingGet("WandBag.pos_x")
+		button_pos_y = ModSettingGet("WandBag.pos_y")
+	end
+	button_locked = ModSettingGet("WandBag.locked")
+end
+
 function OnWorldPreUpdate()
 	gui = gui or GuiCreate()
 	open = open or false
@@ -203,7 +219,17 @@ function OnWorldPreUpdate()
 	GuiStartFrame(gui)
 	GuiOptionsAdd(gui, GUI_OPTION.NoPositionTween)
 	local inventory_open = is_inventory_open()
-	if not inventory_open and GuiImageButton(gui, new_id(), 2, 22, "", "mods/WandBag/files/gui_button.png") then
+	if not inventory_open and not button_locked then
+		GuiOptionsAddForNextWidget(gui, GUI_OPTION.IsExtraDraggable)
+		GuiOptionsAddForNextWidget(gui, GUI_OPTION.DrawNoHoverAnimation)
+		GuiImageButton(gui, 66666, button_pos_x, button_pos_y, "", "mods/WandBag/files/gui_button_invisible.png")
+		local _, _, hovered, x, y, draw_width, draw_height, draw_x, draw_y = GuiGetPreviousWidgetInfo(gui)
+		if draw_x ~= 0 and draw_y ~= 0 and draw_x ~= button_pos_x and draw_y ~= button_pos_y then
+			button_pos_x = draw_x - draw_width / 2
+			button_pos_y = draw_y - draw_height / 2
+		end
+	end
+	if not inventory_open and GuiImageButton(gui, new_id(), button_pos_x, button_pos_y, "", "mods/WandBag/files/gui_button.png") then
 		open = not open
 	end
 	if open and not inventory_open then
