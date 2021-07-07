@@ -1,6 +1,6 @@
 dofile("data/scripts/lib/mod_settings.lua")
 
-local mod_id = "WandBag"
+local mod_id = "InventoryBags"
 mod_settings_version = 1
 mod_settings =
 {
@@ -54,8 +54,23 @@ function adjust_setting_values(screen_width, screen_height)
 	end
 end
 
+local function MigrateWandBagSettingsToInventoryBags()
+	ModSettingRemove("WandBag._version")
+	for i, setting in ipairs(mod_settings) do
+		if not setting.not_setting then
+			local setting_id = mod_setting_get_id("WandBag",  setting.id)
+			local old_value = ModSettingGet(setting_id)
+			ModSettingRemove(setting_id)
+			ModSettingSetNextValue(mod_setting_get_id(mod_id, setting.id), old_value, true)
+		end
+	end
+end
+
 function ModSettingsUpdate(init_scope)
 	local old_version = mod_settings_get_version(mod_id)
+	if ModSettingGet("WandBag._version") == 1 then
+		MigrateWandBagSettingsToInventoryBags()
+	end
 	mod_settings_update(mod_id, mod_settings, init_scope)
 end
 

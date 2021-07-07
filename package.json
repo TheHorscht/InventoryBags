@@ -1,6 +1,6 @@
 {
-  "name": "WandBag",
-  "version": "0.2.0",
+  "name": "InventoryBags",
+  "version": "0.3.0",
   "description": "",
   "main": "build.js",
   "directories": {

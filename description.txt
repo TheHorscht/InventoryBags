@@ -1,5 +1,7 @@
-Lets you carry more wands by stowing them away in a bag, from which you can take them out anytime.
+Lets you carry more stuff by stowing it away in bags, from which you can take it out again anytime.
 
-Open the bag by clicking the icon to the left of the wand selection.
-Then click on a wand to stow it away, click on a wand in the storage to take it back out again.
+Open the bags by clicking the icon to the left of the wand selection.
+Then click on an item to stow it away, click on an item in the storage to take it back out again.
 It might bug out sometimes so make sure you have the right wand selected (maybe reselect it) before firing.
+
+The open/close button can be repositioned by toggling it draggable in the mod settings menu.

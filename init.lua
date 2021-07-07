@@ -1,7 +1,7 @@
 dofile_once("data/scripts/lib/utilities.lua")
 dofile_once("data/scripts/gun/gun_actions.lua")
-local nxml = dofile_once("mods/WandBag/lib/nxml.lua")
-local EZWand = dofile_once("mods/WandBag/lib/EZWand.lua")
+local nxml = dofile_once("mods/InventoryBags/lib/nxml.lua")
+local EZWand = dofile_once("mods/InventoryBags/lib/EZWand.lua")
 
 local rows = 4
 
@@ -315,23 +315,6 @@ function OnPlayerSpawned(player)
 	if item_storage == 0 then
 		item_storage = EntityCreateNew("item_storage_container")
 		EntityAddChild(player, item_storage)
-
-		local x, y = EntityGetTransform(player)
-		for i, item in ipairs({
-			"data/entities/items/pickup/potion_slime.xml",
-			"data/entities/items/pickup/broken_wand.xml",
-			"data/entities/items/pickup/moon.xml",
-			"data/entities/items/pickup/potion_vomit.xml",
-			"data/entities/items/pickup/egg_red.xml",
-			"data/entities/items/pickup/jar_of_urine.xml",
-			"data/entities/items/pickup/evil_eye.xml",
-			"data/entities/items/pickup/powder_stash.xml",
-			"data/entities/animals/boss_centipede/sampo.xml",
-			"data/entities/items/books/book_05.xml",
-		}) do
-			local entity = EntityLoad(item, x, y)
-			EntityAddChild(item_storage, entity)
-		end
 	end
 end
 
@@ -345,20 +328,20 @@ function is_inventory_open()
 	end
 end
 
-button_pos_x = ModSettingGet("WandBag.pos_x")
-button_pos_y = ModSettingGet("WandBag.pos_y")
-button_locked = ModSettingGet("WandBag.locked")
+button_pos_x = ModSettingGet("InventoryBags.pos_x")
+button_pos_y = ModSettingGet("InventoryBags.pos_y")
+button_locked = ModSettingGet("InventoryBags.locked")
 
 -- OnModSettingsChanged() seems to not work
 function OnPausedChanged(is_paused, is_inventory_pause)
 	if not button_locked and is_paused then
-		ModSettingSetNextValue("WandBag.pos_x", button_pos_x, false)
-		ModSettingSetNextValue("WandBag.pos_y", button_pos_y, false)
+		ModSettingSetNextValue("InventoryBags.pos_x", button_pos_x, false)
+		ModSettingSetNextValue("InventoryBags.pos_y", button_pos_y, false)
 	else
-		button_pos_x = ModSettingGet("WandBag.pos_x")
-		button_pos_y = ModSettingGet("WandBag.pos_y")
+		button_pos_x = ModSettingGet("InventoryBags.pos_x")
+		button_pos_y = ModSettingGet("InventoryBags.pos_y")
 	end
-	button_locked = ModSettingGet("WandBag.locked")
+	button_locked = ModSettingGet("InventoryBags.locked")
 end
 
 function OnWorldPreUpdate()
@@ -376,7 +359,7 @@ function OnWorldPreUpdate()
 	if not inventory_open and not button_locked then
 		GuiOptionsAddForNextWidget(gui, GUI_OPTION.IsExtraDraggable)
 		GuiOptionsAddForNextWidget(gui, GUI_OPTION.DrawNoHoverAnimation)
-		GuiImageButton(gui, 5318008, button_pos_x, button_pos_y, "", "mods/WandBag/files/gui_button_invisible.png")
+		GuiImageButton(gui, 5318008, button_pos_x, button_pos_y, "", "mods/InventoryBags/files/gui_button_invisible.png")
 		local _, _, hovered, x, y, draw_width, draw_height, draw_x, draw_y = GuiGetPreviousWidgetInfo(gui)
 		if draw_x ~= 0 and draw_y ~= 0 and draw_x ~= button_pos_x and draw_y ~= button_pos_y then
 			button_pos_x = draw_x - draw_width / 2
@@ -384,7 +367,7 @@ function OnWorldPreUpdate()
 		end
 	end
 	-- Toggle it open/closed
-	if not inventory_open and GuiImageButton(gui, new_id(), button_pos_x, button_pos_y, "", "mods/WandBag/files/gui_button.png") then
+	if not inventory_open and GuiImageButton(gui, new_id(), button_pos_x, button_pos_y, "", "mods/InventoryBags/files/gui_button.png") then
 		open = not open
 	end
 
@@ -397,7 +380,7 @@ function OnWorldPreUpdate()
 		-- Render wand bag
 		local origin_x, origin_y = 23, 48
 		GuiZSetForNextWidget(gui, 20)
-		GuiImageNinePiece(gui, new_id(), origin_x, origin_y, box_width, box_height, 1, "mods/WandBag/files/container_9piece.png", "mods/WandBag/files/container_9piece.png")
+		GuiImageNinePiece(gui, new_id(), origin_x, origin_y, box_width, box_height, 1, "mods/InventoryBags/files/container_9piece.png", "mods/InventoryBags/files/container_9piece.png")
 		local tooltip_wand
 		local held_wands = get_held_wands()
 		local taken_slots = {}
@@ -416,7 +399,7 @@ function OnWorldPreUpdate()
 				end
 				GuiZSetForNextWidget(gui, -9)
 				if wand.active then
-					GuiImage(gui, new_id(), x + (width / 2 - (16 * scale) / 2), y + (height / 2 - (16 * scale) / 2), "mods/WandBag/files/highlight_box.png", 1, scale, scale)
+					GuiImage(gui, new_id(), x + (width / 2 - (16 * scale) / 2), y + (height / 2 - (16 * scale) / 2), "mods/InventoryBags/files/highlight_box.png", 1, scale, scale)
 				end
 				GuiZSetForNextWidget(gui, -10)
 				GuiImage(gui, new_id(), x + (width / 2 - (w * scale) / 2), y + (height / 2 - (h * scale) / 2), wand.image_file, 1, scale, scale, 0, GUI_RECT_ANIMATION_PLAYBACK.Loop)
@@ -451,7 +434,7 @@ function OnWorldPreUpdate()
 		-- Render item bag
 		origin_x = origin_x + box_width + 9
 		GuiZSetForNextWidget(gui, 20)
-		GuiImageNinePiece(gui, new_id(), origin_x, origin_y, box_width, box_height, 1, "mods/WandBag/files/container_9piece.png", "mods/WandBag/files/container_9piece.png")
+		GuiImageNinePiece(gui, new_id(), origin_x, origin_y, box_width, box_height, 1, "mods/InventoryBags/files/container_9piece.png", "mods/InventoryBags/files/container_9piece.png")
 		local tooltip_item
 		local held_items = get_held_items()
 		local taken_slots = {}
@@ -470,7 +453,7 @@ function OnWorldPreUpdate()
 				end
 				GuiZSetForNextWidget(gui, -9)
 				if item.active then
-					GuiImage(gui, new_id(), x + (width / 2 - (16 * scale) / 2), y + (height / 2 - (16 * scale) / 2), "mods/WandBag/files/highlight_box.png", 1, scale, scale)
+					GuiImage(gui, new_id(), x + (width / 2 - (16 * scale) / 2), y + (height / 2 - (16 * scale) / 2), "mods/InventoryBags/files/highlight_box.png", 1, scale, scale)
 				end
 				GuiZSetForNextWidget(gui, -10)
 				local potion_color = GameGetPotionColorUint(item.entity_id)
@@ -584,14 +567,18 @@ function OnWorldPreUpdate()
 		end
 		-- Render a tooltip of the hovered item if we have any
 		if tooltip_item then
+			local ability_component = EntityGetFirstComponentIncludingDisabled(tooltip_item, "AbilityComponent")
 			local item_component = EntityGetFirstComponentIncludingDisabled(tooltip_item, "ItemComponent")
 			local potion_component = EntityGetFirstComponentIncludingDisabled(tooltip_item, "PotionComponent")
-			local item_name = ComponentGetValue2(item_component, "item_name")
-			item_name = GameTextGetTranslatedOrNot(item_name)
 			local description = ComponentGetValue2(item_component, "ui_description")
 			description = GameTextGetTranslatedOrNot(description)
 			description = split_string(description, "\n")
 			local lines = {}
+			local item_name = ComponentGetValue2(ability_component, "ui_name")
+			-- Item name is either stored on AbilityComponent:ui_name or if that doesn't exist, ItemComponent:item_name
+			if not item_name then
+				item_name = ComponentGetValue2(item_component, "item_name")
+			end
 			if potion_component then
 				local main_material_id = GetMaterialInventoryMainMaterial(tooltip_item)
 				local main_material = CellFactory_GetUIName(main_material_id)
@@ -609,13 +596,15 @@ function OnWorldPreUpdate()
 						table.insert(lines, ("%s (%d)"):format(material_name:gsub("^%l", string.upper), amount))
 					end
 				end
-				local fill_percent = (total_amount / barrel_size) * 100
-				item_name = ("%s %s (%d%% Full)\n"):format(main_material, item_name, fill_percent)
+				local fill_percent = math.ceil((total_amount / barrel_size) * 100)
+				item_name = (GameTextGet(item_name, main_material) .. GameTextGet("$item_potion_fullness", fill_percent)):upper()
+			else
+				item_name = GameTextGetTranslatedOrNot(item_name):upper()
 			end
 			GuiBeginAutoBox(gui)
 			GuiLayoutBeginHorizontal(gui, origin_x + box_width + 20, origin_y + 5, true)
 			GuiLayoutBeginVertical(gui, 0, 0)
-			GuiText(gui, 0, 0, item_name:upper())
+			GuiText(gui, 0, 0, item_name)
 			for i, line in ipairs(description) do
 				GuiText(gui, 0, i == 1 and 7 or 0, line)
 			end

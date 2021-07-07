@@ -1,5 +1,5 @@
 <Mod
-	name="Wand Bag"
+	name="Inventory Bags"
 	description=""
 	tags="tweaks,quality of life"
 	dont_upload_folders="node_modules|dist|gimp|fmod"
