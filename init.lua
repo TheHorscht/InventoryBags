@@ -10,6 +10,15 @@ for i, action in ipairs(actions) do
 	spell_icon_lookup[action.id] = action.sprite
 end
 
+local function split_string(inputstr, sep)
+  sep = sep or "%s"
+  local t= {}
+  for str in string.gmatch(inputstr, "([^"..sep.."]+)") do
+    table.insert(t, str)
+  end
+  return t
+end
+
 local function ends_with(str, ending)
   return ending == "" or str:sub(-#ending) == ending
 end
@@ -49,7 +58,8 @@ end
 
 function is_item(entity)
 	local ability_component = EntityGetFirstComponentIncludingDisabled(entity, "AbilityComponent")
-	return ComponentGetValue2(ability_component, "use_gun_script") == false
+	local ending_mc_guffin_component = EntityGetFirstComponentIncludingDisabled(entity, "EndingMcGuffinComponent")
+	return ending_mc_guffin_component or ComponentGetValue2(ability_component, "use_gun_script") == false
 end
 
 function get_inventory()
@@ -317,6 +327,7 @@ function OnPlayerSpawned(player)
 			"data/entities/items/pickup/evil_eye.xml",
 			"data/entities/items/pickup/powder_stash.xml",
 			"data/entities/animals/boss_centipede/sampo.xml",
+			"data/entities/items/books/book_05.xml",
 		}) do
 			local entity = EntityLoad(item, x, y)
 			EntityAddChild(item_storage, entity)
@@ -579,6 +590,7 @@ function OnWorldPreUpdate()
 			item_name = GameTextGetTranslatedOrNot(item_name)
 			local description = ComponentGetValue2(item_component, "ui_description")
 			description = GameTextGetTranslatedOrNot(description)
+			description = split_string(description, "\n")
 			local lines = {}
 			if potion_component then
 				local main_material_id = GetMaterialInventoryMainMaterial(tooltip_item)
@@ -604,9 +616,11 @@ function OnWorldPreUpdate()
 			GuiLayoutBeginHorizontal(gui, origin_x + box_width + 20, origin_y + 5, true)
 			GuiLayoutBeginVertical(gui, 0, 0)
 			GuiText(gui, 0, 0, item_name:upper())
-			GuiText(gui, 0, 7, description)
+			for i, line in ipairs(description) do
+				GuiText(gui, 0, i == 1 and 7 or 0, line)
+			end
 			for i, line in ipairs(lines) do
-				GuiText(gui, 0, 0, line)
+				GuiText(gui, 0, i == 1 and 7 or -1, line)
 			end
 			GuiLayoutEnd(gui)
 			GuiLayoutEnd(gui)
