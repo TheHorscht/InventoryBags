@@ -1,5 +1,4 @@
 dofile_once("data/scripts/lib/utilities.lua")
-dofile_once("data/scripts/lib/utilities.lua")
 dofile_once("data/scripts/gun/gun_actions.lua")
 local nxml = dofile_once("mods/WandBag/lib/nxml.lua")
 local EZWand = dofile_once("mods/WandBag/lib/EZWand.lua")
@@ -48,6 +47,11 @@ function is_wand(entity)
 	return ComponentGetValue2(ability_component, "use_gun_script") == true
 end
 
+function is_item(entity)
+	local ability_component = EntityGetFirstComponentIncludingDisabled(entity, "AbilityComponent")
+	return ComponentGetValue2(ability_component, "use_gun_script") == false
+end
+
 function get_inventory()
 	local player = EntityGetWithTag("player_unit")[1]
 	if player then
@@ -61,7 +65,7 @@ end
 
 function get_held_wands()
 	local inventory = get_inventory()
-	if inventory > 0 then
+	if inventory then
 		local active_item = get_active_item()
 		local wands = {}
 		for i, wand in ipairs(EntityGetAllChildren(inventory) or {}) do
@@ -80,6 +84,32 @@ function get_held_wands()
 			end
 		end
 		return wands
+	else
+		return {}
+	end
+end
+
+function get_held_items()
+	local inventory = get_inventory()
+	if inventory then
+		local active_item = get_active_item()
+		local items = {}
+		for i, item in ipairs(EntityGetAllChildren(inventory) or {}) do
+			if is_item(item) then
+				local item_component = EntityGetFirstComponentIncludingDisabled(item, "ItemComponent")
+				local image_file = ComponentGetValue2(item_component, "ui_sprite")
+				if ends_with(image_file, ".xml") then
+					image_file = get_wand_xml_sprite(image_file)
+				end
+				table.insert(items, {
+					entity_id = item,
+					image_file = image_file,
+					inventory_slot = get_inventory_position(item),
+					active = item == active_item
+				})
+			end
+		end
+		return items
 	else
 		return {}
 	end
@@ -106,6 +136,42 @@ function get_stored_wands()
 	end
 end
 
+--[[ 
+
+  <ItemComponent
+    _tags="enabled_in_world"
+    item_name="$item_potion"
+    max_child_items="0"
+    is_pickable="1"
+    is_equipable_forced="1"
+    ui_sprite="data/ui_gfx/items/potion.png"
+    ui_description="$item_description_potion"
+    preferred_inventory="QUICK"
+  ></ItemComponent>
+
+ ]]
+
+function get_stored_items()
+	local item_storage = EntityGetWithName("item_storage_container")
+	if item_storage > 0 then
+		local items = EntityGetAllChildren(item_storage) or {}
+		for i, item in ipairs(items) do
+			local item_component = EntityGetFirstComponentIncludingDisabled(item, "ItemComponent")
+			local image_file = ComponentGetValue2(item_component, "ui_sprite")
+			if ends_with(image_file, ".xml") then
+				image_file = get_wand_xml_sprite(image_file)
+			end
+			items[i] = {
+				entity_id = item,
+				image_file = image_file
+			}
+		end
+		return items
+	else
+		return {}
+	end
+end
+
 function put_wand_in_storage(wand)
 	local wand_storage = EntityGetWithName("wand_storage_container")
 	local num_wands_stored = #(EntityGetAllChildren(wand_storage) or {})
@@ -122,9 +188,28 @@ function put_wand_in_storage(wand)
 	end
 end
 
+function put_item_in_storage(item)
+	local item_storage = EntityGetWithName("item_storage_container")
+	local num_items_stored = #(EntityGetAllChildren(item_storage) or {})
+	if num_items_stored >= rows * 4 then GamePrint("Item bag is full") return end
+	local player = EntityGetWithTag("player_unit")[1]
+	if player and item_storage > 0 then
+		local inventory2 = EntityGetFirstComponentIncludingDisabled(player, "Inventory2Component")
+		local mActiveItem = ComponentGetValue2(inventory2, "mActiveItem")
+		EntityRemoveFromParent(item)
+		EntityAddChild(item_storage, item)
+		if item == mActiveItem then
+			ComponentSetValue2(inventory2, "mActiveItem", 0)
+		end
+	end
+end
+
 function has_enough_space_for_wand()
-	local inventory = get_inventory()
 	return #get_held_wands() < 4
+end
+
+function has_enough_space_for_item()
+	return #get_held_items() < 4
 end
 
 function retrieve_or_swap_wand(wand)
@@ -150,6 +235,29 @@ function retrieve_or_swap_wand(wand)
 	end
 end
 
+function retrieve_or_swap_item(item)
+	local inventory = get_inventory()
+	local item_storage = EntityGetWithName("item_storage_container")
+	if inventory > 0 and item_storage > 0 then
+		local active_item = get_active_item()
+		local inventory_slot
+		if not has_enough_space_for_item() and active_item and is_item(active_item) then
+			-- Swap
+			inventory_slot = get_inventory_position(active_item)
+			EntityRemoveFromParent(active_item)
+			EntityAddChild(item_storage, active_item)
+		end
+		local first_free_item_slot = get_first_free_item_slot()
+		-- Make sure we only pick up the item if either we have an item selected that we will swap with, or have enough space
+		if inventory_slot or first_free_item_slot then
+			EntityRemoveFromParent(item)
+			EntityAddChild(inventory, item)
+			set_active_item(item)
+			set_inventory_position(item, inventory_slot and inventory_slot or first_free_item_slot)
+		end
+	end
+end
+
 function get_first_free_wand_slot()
 	local wands = get_held_wands()
 	local free_wand_slots = { true, true, true, true }
@@ -157,6 +265,19 @@ function get_first_free_wand_slot()
 		free_wand_slots[wand.inventory_slot+1] = false
 	end
 	for slot, slot_is_free in ipairs(free_wand_slots) do
+		if slot_is_free then
+			return slot-1
+		end
+	end
+end
+
+function get_first_free_item_slot()
+	local items = get_held_items()
+	local free_item_slots = { true, true, true, true }
+	for i, item in ipairs(items) do
+		free_item_slots[item.inventory_slot+1] = false
+	end
+	for slot, slot_is_free in ipairs(free_item_slots) do
 		if slot_is_free then
 			return slot-1
 		end
@@ -179,6 +300,27 @@ function OnPlayerSpawned(player)
 	if wand_storage == 0 then
 		wand_storage = EntityCreateNew("wand_storage_container")
 		EntityAddChild(player, wand_storage)
+	end
+	local item_storage = EntityGetWithName("item_storage_container")
+	if item_storage == 0 then
+		item_storage = EntityCreateNew("item_storage_container")
+		EntityAddChild(player, item_storage)
+
+		local x, y = EntityGetTransform(player)
+		for i, item in ipairs({
+			"data/entities/items/pickup/potion_slime.xml",
+			"data/entities/items/pickup/broken_wand.xml",
+			"data/entities/items/pickup/moon.xml",
+			"data/entities/items/pickup/potion_vomit.xml",
+			"data/entities/items/pickup/egg_red.xml",
+			"data/entities/items/pickup/jar_of_urine.xml",
+			"data/entities/items/pickup/evil_eye.xml",
+			"data/entities/items/pickup/powder_stash.xml",
+			"data/entities/animals/boss_centipede/sampo.xml",
+		}) do
+			local entity = EntityLoad(item, x, y)
+			EntityAddChild(item_storage, entity)
+		end
 	end
 end
 
@@ -219,25 +361,29 @@ function OnWorldPreUpdate()
 	GuiStartFrame(gui)
 	GuiOptionsAdd(gui, GUI_OPTION.NoPositionTween)
 	local inventory_open = is_inventory_open()
+	-- If button dragging is enabled in the settings and the inventory is not open, make it draggable
 	if not inventory_open and not button_locked then
 		GuiOptionsAddForNextWidget(gui, GUI_OPTION.IsExtraDraggable)
 		GuiOptionsAddForNextWidget(gui, GUI_OPTION.DrawNoHoverAnimation)
-		GuiImageButton(gui, 66666, button_pos_x, button_pos_y, "", "mods/WandBag/files/gui_button_invisible.png")
+		GuiImageButton(gui, 5318008, button_pos_x, button_pos_y, "", "mods/WandBag/files/gui_button_invisible.png")
 		local _, _, hovered, x, y, draw_width, draw_height, draw_x, draw_y = GuiGetPreviousWidgetInfo(gui)
 		if draw_x ~= 0 and draw_y ~= 0 and draw_x ~= button_pos_x and draw_y ~= button_pos_y then
 			button_pos_x = draw_x - draw_width / 2
 			button_pos_y = draw_y - draw_height / 2
 		end
 	end
+	-- Toggle it open/closed
 	if not inventory_open and GuiImageButton(gui, new_id(), button_pos_x, button_pos_y, "", "mods/WandBag/files/gui_button.png") then
 		open = not open
 	end
+
+	local slot_width, slot_height = 16, 16
+	local slot_margin = 1
+	local slot_width_total, slot_height_total = (slot_width + slot_margin * 2), (slot_height + slot_margin * 2)
+	local spacer = 4
+	local box_width, box_height = slot_width_total * 4, slot_height_total * (rows+1) + spacer
 	if open and not inventory_open then
-		local slot_width, slot_height = 16, 16
-		local slot_margin = 1
-		local slot_width_total, slot_height_total = (slot_width + slot_margin * 2), (slot_height + slot_margin * 2)
-		local spacer = 4
-		local box_width, box_height = slot_width_total * 4, slot_height_total * (rows+1) + spacer
+		-- Render wand bag
 		local origin_x, origin_y = 23, 48
 		GuiZSetForNextWidget(gui, 20)
 		GuiImageNinePiece(gui, new_id(), origin_x, origin_y, box_width, box_height, 1, "mods/WandBag/files/container_9piece.png", "mods/WandBag/files/container_9piece.png")
@@ -286,6 +432,74 @@ function OnWorldPreUpdate()
 					end
 					GuiZSetForNextWidget(gui, -10)
 					GuiImage(gui, new_id(), x + (width / 2 - (w * scale) / 2), y + (height / 2 - (h *scale) / 2), wand.image_file, 1, scale, scale, 0, GUI_RECT_ANIMATION_PLAYBACK.Loop)
+				else
+					GuiImage(gui, new_id(), origin_x + slot_margin + ix * slot_width_total, origin_y + spacer + slot_margin + slot_height_total + iy * slot_height_total, "data/ui_gfx/inventory/inventory_box.png", 1, 1, 1)
+				end
+			end
+		end
+		-- Render item bag
+		origin_x = origin_x + box_width + 9
+		GuiZSetForNextWidget(gui, 20)
+		GuiImageNinePiece(gui, new_id(), origin_x, origin_y, box_width, box_height, 1, "mods/WandBag/files/container_9piece.png", "mods/WandBag/files/container_9piece.png")
+		local tooltip_item
+		local held_items = get_held_items()
+		local taken_slots = {}
+		-- Render the held items and save the taken positions so we can render the empty slots after this
+		for i, item in ipairs(held_items) do
+			if item then
+				taken_slots[item.inventory_slot] = true
+				if GuiImageButton(gui, new_id(), origin_x + slot_margin + item.inventory_slot * slot_width_total, origin_y + slot_margin, "", "data/ui_gfx/inventory/inventory_box.png") then
+					put_item_in_storage(item.entity_id)
+				end
+				local _, _, hovered, x, y, width, height = GuiGetPreviousWidgetInfo(gui)
+				local w, h = GuiGetImageDimensions(gui, item.image_file, 1)
+				local scale = hovered and 1.2 or 1
+				if hovered then
+					tooltip_item = item.entity_id
+				end
+				GuiZSetForNextWidget(gui, -9)
+				if item.active then
+					GuiImage(gui, new_id(), x + (width / 2 - (16 * scale) / 2), y + (height / 2 - (16 * scale) / 2), "mods/WandBag/files/highlight_box.png", 1, scale, scale)
+				end
+				GuiZSetForNextWidget(gui, -10)
+				local potion_color = GameGetPotionColorUint(item.entity_id)
+				if potion_color ~= 0 then
+					local b = bit.rshift(bit.band(potion_color, 0xFF0000), 16) / 0xFF
+					local g = bit.rshift(bit.band(potion_color, 0xFF00), 8) / 0xFF
+					local r = bit.band(potion_color, 0xFF) / 0xFF
+					GuiColorSetForNextWidget(gui, r, g, b, 1)
+				end
+				GuiImage(gui, new_id(), x + (width / 2 - (w * scale) / 2), y + (height / 2 - (h * scale) / 2), item.image_file, 1, scale, scale, 0, GUI_RECT_ANIMATION_PLAYBACK.Loop)
+			end
+		end
+		for i=0, (4-1) do
+			if not taken_slots[i] then
+				GuiImage(gui, new_id(), origin_x + slot_margin + i * slot_width_total, origin_y + slot_margin, "data/ui_gfx/inventory/inventory_box.png", 1, 1, 1)
+			end
+		end
+		local stored_items = get_stored_items()
+		for iy=0, (rows-1) do
+			for ix=0, (4-1) do
+				local item = stored_items[(iy*4 + ix) + 1]
+				if item then
+					if GuiImageButton(gui, new_id(), origin_x + slot_margin + ix * slot_width_total, origin_y + spacer + slot_margin + slot_height_total + iy * slot_height_total, "", "data/ui_gfx/inventory/inventory_box.png") then
+						retrieve_or_swap_item(item.entity_id)
+					end
+					local _, _, hovered, x, y, width, height = GuiGetPreviousWidgetInfo(gui)
+					local w, h = GuiGetImageDimensions(gui, item.image_file, 1)
+					local scale = hovered and 1.2 or 1
+					if hovered then
+						tooltip_item = item.entity_id
+					end
+					GuiZSetForNextWidget(gui, -10)
+					local potion_color = GameGetPotionColorUint(item.entity_id)
+					if potion_color ~= 0 then
+						local b = bit.rshift(bit.band(potion_color, 0xFF0000), 16) / 0xFF
+						local g = bit.rshift(bit.band(potion_color, 0xFF00), 8) / 0xFF
+						local r = bit.band(potion_color, 0xFF) / 0xFF
+						GuiColorSetForNextWidget(gui, r, g, b, 1)
+					end
+					GuiImage(gui, new_id(), x + (width / 2 - (w * scale) / 2), y + (height / 2 - (h *scale) / 2), item.image_file, 1, scale, scale, 0, GUI_RECT_ANIMATION_PLAYBACK.Loop)
 				else
 					GuiImage(gui, new_id(), origin_x + slot_margin + ix * slot_width_total, origin_y + spacer + slot_margin + slot_height_total + iy * slot_height_total, "data/ui_gfx/inventory/inventory_box.png", 1, 1, 1)
 				end
@@ -353,6 +567,48 @@ function OnWorldPreUpdate()
 					GuiLayoutBeginHorizontal(gui, spread_icon_x, spread_icon_y + spread_icon_height + 3 + row * 20 * spell_icon_scale, true)
 				end
 			end
+			GuiLayoutEnd(gui)
+			GuiZSetForNextWidget(gui, 10)
+			GuiEndAutoBoxNinePiece(gui)
+		end
+		-- Render a tooltip of the hovered item if we have any
+		if tooltip_item then
+			local item_component = EntityGetFirstComponentIncludingDisabled(tooltip_item, "ItemComponent")
+			local potion_component = EntityGetFirstComponentIncludingDisabled(tooltip_item, "PotionComponent")
+			local item_name = ComponentGetValue2(item_component, "item_name")
+			item_name = GameTextGetTranslatedOrNot(item_name)
+			local description = ComponentGetValue2(item_component, "ui_description")
+			description = GameTextGetTranslatedOrNot(description)
+			local lines = {}
+			if potion_component then
+				local main_material_id = GetMaterialInventoryMainMaterial(tooltip_item)
+				local main_material = CellFactory_GetUIName(main_material_id)
+				main_material = GameTextGetTranslatedOrNot(main_material)
+				local material_inventory_component = EntityGetFirstComponentIncludingDisabled(tooltip_item, "MaterialInventoryComponent")
+				local material_sucker_component = EntityGetFirstComponentIncludingDisabled(tooltip_item, "MaterialSuckerComponent")
+				local barrel_size = ComponentGetValue2(material_sucker_component, "barrel_size")
+				local count_per_material_type = ComponentGetValue2(material_inventory_component, "count_per_material_type")
+				local total_amount = 0
+				for material_id, amount in pairs(count_per_material_type) do
+					if amount > 0 then
+						total_amount = total_amount + amount
+						local material_name = CellFactory_GetUIName(material_id-1)
+						material_name = GameTextGetTranslatedOrNot(material_name)
+						table.insert(lines, ("%s (%d)"):format(material_name:gsub("^%l", string.upper), amount))
+					end
+				end
+				local fill_percent = (total_amount / barrel_size) * 100
+				item_name = ("%s %s (%d%% Full)\n"):format(main_material, item_name, fill_percent)
+			end
+			GuiBeginAutoBox(gui)
+			GuiLayoutBeginHorizontal(gui, origin_x + box_width + 20, origin_y + 5, true)
+			GuiLayoutBeginVertical(gui, 0, 0)
+			GuiText(gui, 0, 0, item_name:upper())
+			GuiText(gui, 0, 7, description)
+			for i, line in ipairs(lines) do
+				GuiText(gui, 0, 0, line)
+			end
+			GuiLayoutEnd(gui)
 			GuiLayoutEnd(gui)
 			GuiZSetForNextWidget(gui, 10)
 			GuiEndAutoBoxNinePiece(gui)
