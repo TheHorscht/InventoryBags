@@ -1,1 +1,1 @@
-WandBag
+InventoryBags
