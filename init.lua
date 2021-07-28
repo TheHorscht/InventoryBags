@@ -543,17 +543,25 @@ function OnWorldPreUpdate()
 			GuiText(gui, 0, margin, string.format("%.1f DEG", wand.spread))
 			GuiLayoutEnd(gui)
 			GuiLayoutEnd(gui)
+			-- This runs every frame and is very inefficient, I know, but at least it's accurate, caching without detecting spell/wand changes correctly
+			-- could lead to incorrect tooltips
 			local spells = wand:GetSpells()
-			GuiLayoutBeginHorizontal(gui, spread_icon_x, spread_icon_y + spread_icon_height + 3, true)
+			local sorted_spells = {}
+			for i, spell in ipairs(spells) do
+				sorted_spells[tonumber(spell.inventory_x + 1)] = spell
+			end
+			GuiLayoutBeginHorizontal(gui, spread_icon_x, spread_icon_y + spread_icon_height + 7, true)
 			local row = 0
 			local spell_icon_scale = 0.75
-			for i, spell in ipairs(spells) do
+			for i=1, wand.capacity do
 				GuiZSetForNextWidget(gui, 9)
-				GuiImage(gui, new_id(), 0, 0, "data/ui_gfx/inventory/inventory_box.png", 1, spell_icon_scale, spell_icon_scale)
-				local _, _, _, x, y = GuiGetPreviousWidgetInfo(gui)
-				GuiZSetForNextWidget(gui, 8)
-				GuiOptionsAddForNextWidget(gui, GUI_OPTION.Layout_NoLayouting)
-				GuiImage(gui, new_id(), x, y, spell_icon_lookup[spell.action_id] or "data/ui_gfx/gun_actions/unidentified.png", 1, spell_icon_scale, spell_icon_scale)
+				GuiImage(gui, new_id(), -0.5, -0.5, "data/ui_gfx/inventory/inventory_box.png", 1, spell_icon_scale, spell_icon_scale)
+				if sorted_spells[i] then
+					local _, _, _, x, y = GuiGetPreviousWidgetInfo(gui)
+					GuiZSetForNextWidget(gui, 8)
+					GuiOptionsAddForNextWidget(gui, GUI_OPTION.Layout_NoLayouting)
+					GuiImage(gui, new_id(), x, y, spell_icon_lookup[sorted_spells[i].action_id] or "data/ui_gfx/gun_actions/unidentified.png", 1, spell_icon_scale, spell_icon_scale)
+				end
 				-- Start a new row after 10 spells
 				if i % 10 == 0 then
 					row = row + 1
