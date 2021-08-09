@@ -1,4 +1,4 @@
-UNRELEASED:
+v0.4.0:
 - Extended storage space, bags will expand automatically when filled above initial capacity
 
 v0.3.1:

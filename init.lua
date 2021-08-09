@@ -376,12 +376,15 @@ function OnWorldPreUpdate()
 		local stored_wands = get_stored_wands()
 		local held_items = get_held_items()
 		local stored_items = get_stored_items()
-		local rows = math.max(4, math.ceil(math.max(#stored_wands, #stored_items) / 4))
-		local box_width, box_height = slot_width_total * 4, slot_height_total * (rows+1) + spacer
+		local rows_wands = math.max(4, math.ceil(#stored_wands / 4))
+		local rows_items = math.max(4, math.ceil(#stored_items / 4))
+		local box_width = slot_width_total * 4
+		local box_height_wands = slot_height_total * (rows_wands+1) + spacer
+		local box_height_items = slot_height_total * (rows_items+1) + spacer
 		-- Render wand bag
 		local origin_x, origin_y = 23, 48
 		GuiZSetForNextWidget(gui, 20)
-		GuiImageNinePiece(gui, new_id(), origin_x, origin_y, box_width, box_height, 1, "mods/InventoryBags/files/container_9piece.png", "mods/InventoryBags/files/container_9piece.png")
+		GuiImageNinePiece(gui, new_id(), origin_x, origin_y, box_width, box_height_wands, 1, "mods/InventoryBags/files/container_9piece.png", "mods/InventoryBags/files/container_9piece.png")
 		local tooltip_wand
 		local taken_slots = {}
 		-- Render the held wands and save the taken positions so we can render the empty slots after this
@@ -410,7 +413,7 @@ function OnWorldPreUpdate()
 				GuiImage(gui, new_id(), origin_x + slot_margin + i * slot_width_total, origin_y + slot_margin, "data/ui_gfx/inventory/inventory_box.png", 1, 1, 1)
 			end
 		end
-		for iy=0, (rows-1) do
+		for iy=0, (rows_wands-1) do
 			for ix=0, (4-1) do
 				local wand = stored_wands[(iy*4 + ix) + 1]
 				if wand then
@@ -433,7 +436,7 @@ function OnWorldPreUpdate()
 		-- Render item bag
 		origin_x = origin_x + box_width + 9
 		GuiZSetForNextWidget(gui, 20)
-		GuiImageNinePiece(gui, new_id(), origin_x, origin_y, box_width, box_height, 1, "mods/InventoryBags/files/container_9piece.png", "mods/InventoryBags/files/container_9piece.png")
+		GuiImageNinePiece(gui, new_id(), origin_x, origin_y, box_width, box_height_items, 1, "mods/InventoryBags/files/container_9piece.png", "mods/InventoryBags/files/container_9piece.png")
 		local tooltip_item
 		local taken_slots = {}
 		-- Render the held items and save the taken positions so we can render the empty slots after this
@@ -469,7 +472,7 @@ function OnWorldPreUpdate()
 				GuiImage(gui, new_id(), origin_x + slot_margin + i * slot_width_total, origin_y + slot_margin, "data/ui_gfx/inventory/inventory_box.png", 1, 1, 1)
 			end
 		end
-		for iy=0, (rows-1) do
+		for iy=0, (rows_items-1) do
 			for ix=0, (4-1) do
 				local item = stored_items[(iy*4 + ix) + 1]
 				if item then
