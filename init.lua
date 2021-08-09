@@ -3,8 +3,6 @@ dofile_once("data/scripts/gun/gun_actions.lua")
 local nxml = dofile_once("mods/InventoryBags/lib/nxml.lua")
 local EZWand = dofile_once("mods/InventoryBags/lib/EZWand.lua")
 
-local rows = 4
-
 local spell_icon_lookup = {}
 for i, action in ipairs(actions) do
 	spell_icon_lookup[action.id] = action.sprite
@@ -185,7 +183,6 @@ end
 function put_wand_in_storage(wand)
 	local wand_storage = EntityGetWithName("wand_storage_container")
 	local num_wands_stored = #(EntityGetAllChildren(wand_storage) or {})
-	if num_wands_stored >= rows * 4 then GamePrint("Wand bag is full") return end
 	local player = EntityGetWithTag("player_unit")[1]
 	if player and wand_storage > 0 then
 		local inventory2 = EntityGetFirstComponentIncludingDisabled(player, "Inventory2Component")
@@ -201,7 +198,6 @@ end
 function put_item_in_storage(item)
 	local item_storage = EntityGetWithName("item_storage_container")
 	local num_items_stored = #(EntityGetAllChildren(item_storage) or {})
-	if num_items_stored >= rows * 4 then GamePrint("Item bag is full") return end
 	local player = EntityGetWithTag("player_unit")[1]
 	if player and item_storage > 0 then
 		local inventory2 = EntityGetFirstComponentIncludingDisabled(player, "Inventory2Component")
@@ -371,18 +367,22 @@ function OnWorldPreUpdate()
 		open = not open
 	end
 
-	local slot_width, slot_height = 16, 16
-	local slot_margin = 1
-	local slot_width_total, slot_height_total = (slot_width + slot_margin * 2), (slot_height + slot_margin * 2)
-	local spacer = 4
-	local box_width, box_height = slot_width_total * 4, slot_height_total * (rows+1) + spacer
 	if open and not inventory_open then
+		local slot_width, slot_height = 16, 16
+		local slot_margin = 1
+		local slot_width_total, slot_height_total = (slot_width + slot_margin * 2), (slot_height + slot_margin * 2)
+		local spacer = 4
+		local held_wands = get_held_wands()
+		local stored_wands = get_stored_wands()
+		local held_items = get_held_items()
+		local stored_items = get_stored_items()
+		local rows = math.max(4, math.ceil(math.max(#stored_wands, #stored_items) / 4))
+		local box_width, box_height = slot_width_total * 4, slot_height_total * (rows+1) + spacer
 		-- Render wand bag
 		local origin_x, origin_y = 23, 48
 		GuiZSetForNextWidget(gui, 20)
 		GuiImageNinePiece(gui, new_id(), origin_x, origin_y, box_width, box_height, 1, "mods/InventoryBags/files/container_9piece.png", "mods/InventoryBags/files/container_9piece.png")
 		local tooltip_wand
-		local held_wands = get_held_wands()
 		local taken_slots = {}
 		-- Render the held wands and save the taken positions so we can render the empty slots after this
 		for i, wand in ipairs(held_wands) do
@@ -410,7 +410,6 @@ function OnWorldPreUpdate()
 				GuiImage(gui, new_id(), origin_x + slot_margin + i * slot_width_total, origin_y + slot_margin, "data/ui_gfx/inventory/inventory_box.png", 1, 1, 1)
 			end
 		end
-		local stored_wands = get_stored_wands()
 		for iy=0, (rows-1) do
 			for ix=0, (4-1) do
 				local wand = stored_wands[(iy*4 + ix) + 1]
@@ -436,7 +435,6 @@ function OnWorldPreUpdate()
 		GuiZSetForNextWidget(gui, 20)
 		GuiImageNinePiece(gui, new_id(), origin_x, origin_y, box_width, box_height, 1, "mods/InventoryBags/files/container_9piece.png", "mods/InventoryBags/files/container_9piece.png")
 		local tooltip_item
-		local held_items = get_held_items()
 		local taken_slots = {}
 		-- Render the held items and save the taken positions so we can render the empty slots after this
 		for i, item in ipairs(held_items) do
@@ -471,7 +469,6 @@ function OnWorldPreUpdate()
 				GuiImage(gui, new_id(), origin_x + slot_margin + i * slot_width_total, origin_y + slot_margin, "data/ui_gfx/inventory/inventory_box.png", 1, 1, 1)
 			end
 		end
-		local stored_items = get_stored_items()
 		for iy=0, (rows-1) do
 			for ix=0, (4-1) do
 				local item = stored_items[(iy*4 + ix) + 1]
