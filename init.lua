@@ -566,7 +566,7 @@ function OnWorldPreUpdate()
 				if i % 10 == 0 then
 					row = row + 1
 					GuiLayoutEnd(gui)
-					GuiLayoutBeginHorizontal(gui, spread_icon_x, spread_icon_y + spread_icon_height + 3 + row * 20 * spell_icon_scale, true)
+					GuiLayoutBeginHorizontal(gui, spread_icon_x, spread_icon_y + spread_icon_height + 7 + row * 18 * spell_icon_scale, true)
 				end
 			end
 			GuiLayoutEnd(gui)
