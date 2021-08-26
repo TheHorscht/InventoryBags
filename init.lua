@@ -1,11 +1,38 @@
 dofile_once("data/scripts/lib/utilities.lua")
 dofile_once("data/scripts/gun/gun_actions.lua")
 dofile_once("mods/InventoryBags/lib/coroutines.lua")
+local sha1 = dofile_once("mods/InventoryBags/lib/sha1.lua")
 -- dofile_once("data/scripts/lib/coroutines.lua")
 dofile_once("mods/InventoryBags/lib/polytools/polytools_init.lua").init("mods/InventoryBags/lib/polytools")
 local polytools = dofile_once("mods/InventoryBags/lib/polytools/polytools.lua")
 local nxml = dofile_once("mods/InventoryBags/lib/nxml.lua")
 local EZWand = dofile_once("mods/InventoryBags/lib/EZWand.lua")
+
+local wait_ = wait
+function wait(t)
+	print(("wait(%s)"):format(t))
+	wait_(t)
+end
+
+local async_ = async
+function async(func)
+	if not async_running then
+		async_(function()
+			print("<Async>")
+			async_running = true
+			func()
+			print("</Async>")
+			async_running = false
+		end)
+	else
+		func()
+	end
+end
+
+local print_ = print
+function print(...)
+	print_(("(%d) %s"):format(GameGetFrameNum(), select(1, ...)) , select(2, ...))
+end
 
 local spell_icon_lookup = {}
 for i, action in ipairs(actions) do
@@ -195,41 +222,92 @@ function get_stored_items()
 	end
 end
 
+function string_match_percent(ser1, ser2)
+  local character_match_amount = 0
+  local longest_length = math.max(ser1:len(), ser2:len())
+  for i=1, longest_length do
+    if ser1:sub(i,i) == ser2:sub(i,i) then
+      character_match_amount = character_match_amount + 1
+    end
+  end
+  return character_match_amount / longest_length
+end
+
 ---Needs to be called from inside an async function. Kills entity and returns the serialized string.
-function serialize_entity(entity)
+function serialize_entity(entity, dont_kill)
+	print(("serialize_entity(%s) called"):format(entity))
 	-- EntitySetName(entity, "to_be_serialized")
-	EntitySetTransform(entity, 6666666, 6666666)
+	EntityApplyTransform(entity, 6666666, 6666666)
+	-- EntitySave(entity, "xxx_serialized_" .. entity .. ".xml")
+	-- wait(0)
 	local serialized = polytools.save(entity)
 	-- Wait until polymorph wears off so we can kill the entity
-	wait(1)
+	-- wait(0)
+	print("serialized hash = " .. sha1.hex(serialized):sub(1,8))
 	-- entity = EntityGetWithName("to_be_serialized")
+	local entity_before = entity
+	wait(0)
 	entity = EntityGetInRadius(6666666, 6666666, 5)[1]
-	EntityKill(entity)
+	-- if not deserialized then
+	-- local deserialized = deserialize_entity(serialized)
+	-- 	print("Entity was UNDESERIALIZABLE!!!!!")
+	-- 	print("> entity_before: " .. tostring(entity_before))
+	-- 	print("> entity: ".. tostring(entity))
+	-- 	print("> serialized: " .. sha1.hex(serialized):sub(1,8))
+	-- 	if EntityGetName(entity_before) == "polytools" then
+	-- 		print("Name is polytools")
+	-- 	end
+	-- 	EntitySave(entity_before, "xxx.xml")
+	-- else
+		if not dont_kill then EntityKill(entity) end
+		-- EntityKill(entity)
+	-- end
 	return serialized
 end
 
 function deserialize_entity(str)
+	print(("deserialize_entity(%s) called"):format(sha1.hex(str):sub(1,8)))
 	local entity = EntityCreateNew()
-	EntitySetTransform(entity, 6666666, 6666666)
+	-- Move the entity to a unique location so that we can get a reference to the entity with EntityGetInRadius once polymorph wears off
+	local temp_x, temp_y = 173, -135
+	EntityApplyTransform(entity, temp_x, temp_y)
+	-- EntityApplyTransform(entity, 6666666, 6666666)
 	-- local entity = EntityCreateNew("to_be_deserialized")
 	-- Apply polymorph which, when it runs out after 1 frame will turn the entity back into it's original form, which we provide
 	polytools.load(entity, str)
+	-- GameCreateSpriteForXFrames("data/debug/circle_16.png", 50, 50, true, 0, 0, 10000000)
 	-- Wait 1 frame for the polymorph to wear off
-	wait(0)
+	wait(5)
+	print(("Entity(%d) was deserialized. Name = %s"):format(entity, tostring(EntityGetName(entity) or nil)))
+	for i, comp in ipairs(EntityGetAllComponents(entity) or {}) do
+		print(ComponentGetTypeName(comp))
+	end
+	-- wait(1)
 	-- Entity should be ready to collect
 	-- entity = EntityGetWithName("to_be_deserialized")
 	-- EntitySetName(entity, "")
-	entity = EntityGetInRadius(6666666, 6666666, 5)[1]
-	EntitySetTransform(entity, 5555555, 5555555)
+	local all_entities = EntityGetInRadius(temp_x, temp_y, 5)
+	-- EntityAddComponent2(all_entities[1], "SpriteComponent", { image_file = "data/debug/circle_16.png", offset_x = 8, offset_y = 8 })
+	-- EntitySave(all_entities[1], "xxx.xml")
+	-- local all_entities = EntityGetInRadius(6666666, 6666666, 5)
+	-- assert(#all_entities == 1, "Found entites was not 1, was: " .. tostring(#all_entities))
+	-- entity = all_entities[1]
+	-- local serialized = serialize_entity(entity, true)
+	-- wait(0)
+	-- local match_percent = string_match_percent(serialized, str)
+	-- assert(match_percent > 0.9, tostring(match_percent))
+	-- -- Move them out of the way so they can't be detected again
+	-- EntityApplyTransform(entity, 50, 50)
+	-- EntityApplyTransform(entity, 5555555, 5555555)
 	-- for i, w in ipairs(wands) do
 	-- 	EntitySave(w, "xxx" .. i .. ".xml")
 	-- end
 	-- print(#wands)
-	print("SHIIIIIIIIIIIIIIIIT" .. tostring(entity))
-	return entity
+	return all_entities[1]
 end
 
 function create_storage_entity(ez, poly)
+	print(("create_storage_entity(%s, %s) called"):format(ez, sha1.hex(poly):sub(1,8)))
 	local entity = EntityCreateNew()
 	EntityAddComponent2(entity, "VariableStorageComponent", {
 		name = "serialized_ez",
@@ -242,11 +320,13 @@ function create_storage_entity(ez, poly)
 	return entity
 end
 
-function put_wand_in_storage(wand)
+function put_wand_in_storage(wand, do_async)
+	do_async = do_async and true or false
+	print(("put_wand_in_storage(%s) called"):format(wand))
 	local player = EntityGetWithTag("player_unit")[1]
 	local wand_storage = EntityGetWithName("wand_storage_container")
 	if player and wand_storage > 0 then
-		async(function()
+		local func = function()
 			-- EntitySetComponentsWithTagEnabled(wand, "enabled_in_world", false)
 			-- EntitySetComponentsWithTagEnabled(wand, "enabled_in_hand", false)
 			local ez = EZWand(wand):Serialize()
@@ -254,7 +334,12 @@ function put_wand_in_storage(wand)
 			local new_entry = create_storage_entity(ez, poly)
 			-- print(("Adding (%d) to (%d)"):format(wand_storage, new_entry))
 			EntityAddChild(wand_storage, new_entry)
-		end)
+		end
+		if do_async then
+			async(func)
+		else
+			func()
+		end
 
 	-- 	local inventory2 = EntityGetFirstComponentIncludingDisabled(player, "Inventory2Component")
 	-- 	local mActiveItem = ComponentGetValue2(inventory2, "mActiveItem")
@@ -289,6 +374,24 @@ function has_enough_space_for_item()
 	return #get_held_items() < 4
 end
 
+function scroll_inventory(amount)
+	local player = EntityGetWithTag("player_unit")[1]
+	local controls_comp = EntityGetComponentIncludingDisabled(player, "ControlsComponent")[1]
+	-- Disable the controls component so we can set the state ourself instead of it getting it from the input device
+	ComponentSetValue2(controls_comp, "enabled", false)
+	-- Just to make sure this gets re-enabled even it a bug occurs in the code after this
+	async(function()
+		-- Wait one frame then enable it again
+		wait(0)
+		ComponentSetValue2(controls_comp, "enabled", true)
+	end)
+	-- This allows us to simulate inventory scrolling
+	-- Thanks to Lobzyr on the Noita discord for figuring this out
+	ComponentSetValue2(controls_comp, "mButtonDownChangeItemR", true)
+	ComponentSetValue2(controls_comp, "mButtonFrameChangeItemR", GameGetFrameNum() + 1)
+	ComponentSetValue2(controls_comp, "mButtonCountChangeItemR", amount)
+end
+
 ---Returns a table of entity ids currently occupying the inventory, their index is their inventory position
 ---@return table inventory In the form: { [0] = nil, [1] = 307, } etc
 ---@return number active_item
@@ -310,115 +413,92 @@ function get_inventory_and_active_item()
 	return inv_out, active_item
 end
 
+function create_and_pick_up_wand(serialized, slot)
+	print(("create_and_pick_up_wand(%s, %s) called"):format(sha1.hex(serialized):sub(1,8), slot))
+	async(function()
+		local new_wand = deserialize_entity(serialized)
+		if not new_wand then
+			print("NO WAND: " .. tostring(serialized))
+		end
+		-- "Pick up" wand and place it in inventory
+		local item_comp = EntityGetFirstComponentIncludingDisabled(new_wand, "ItemComponent")
+		if not item_comp then
+			wait(0)
+			print("new_wand: " .. tostring(new_wand))
+			print("no item comp, saving entity as xxx.xml " .. tostring(EntityGetName(new_wand) or nil))
+			EntitySave(new_wand, "xxx.xml")
+			for i, comp in ipairs(EntityGetAllComponents(new_wand)) do
+				print(ComponentGetTypeName(comp))
+			end
+		end
+		ComponentSetValue2(item_comp, "is_pickable", true)
+		ComponentSetValue2(item_comp, "play_pick_sound", false)
+		ComponentSetValue2(item_comp, "next_frame_pickable", 0)
+		ComponentSetValue2(item_comp, "npc_next_frame_pickable", 0)
+		local first_free_wand_slot = get_first_free_wand_slot()
+		local new_slot = slot and slot or first_free_wand_slot
+		set_inventory_position(new_wand, new_slot)
+		local inventory = get_inventory()
+		EntityAddChild(inventory, new_wand)
+		-- /"Pick up" wand and place it in inventory
+		do return end
+		-- Scroll to new wand to select it
+		local inventory_slots, active_item = get_inventory_and_active_item()
+		local active_item_item_comp = EntityGetFirstComponentIncludingDisabled(active_item, "ItemComponent")
+		local currently_selected_slot = ComponentGetValue2(active_item_item_comp, "inventory_slot")
+		print("active_item: " .. type(active_item) .. " - " .. tostring(active_item))
+		if not active_item then
+			currently_selected_slot = 0
+		elseif not is_wand(active_item) then
+			currently_selected_slot = currently_selected_slot + 4
+		end
+		-- Potions/Items start at 0, so add 4 to get the absolute position of the item in the inventory
+		-- local inv_count = #get_held_wands() + #get_held_items()
+		local change_amount = 0
+		for i=currently_selected_slot, currently_selected_slot+8 do
+			local slot_to_check = i % 8
+			print("Checking slot " .. tostring(slot_to_check))
+			if slot_to_check == new_slot then
+				print("Change amount found: " .. tostring(change_amount))
+				break
+			end
+			if inventory_slots[slot_to_check+1] then
+				print("inventory_slots[slot_to_check] ("..tostring(slot_to_check)..") exists, adding change_amount + 1")
+				change_amount = change_amount + 1
+			end
+		end
+		scroll_inventory(change_amount)
+		-- /Scroll to new wand to select it
+	end)
+end
+
+-- When taking it out without having an existing active item == FAIL
+
 function retrieve_or_swap_wand(wand)
+	print(("retrieve_or_swap_wand(%s) called (table poly extracted)"):format(sha1.hex(wand.serialized_poly):sub(1,8)))
 	local inventory = get_inventory()
-	local wand_storage = EntityGetWithName("wand_storage_container")
-	if inventory > 0 and wand_storage > 0 then
+	if inventory > 0 then
 		local active_item = get_active_item()
 		local inventory_slot
-		print(("active_item (%d)"):format(active_item))
-		if not has_enough_space_for_wand() and active_item and is_wand(active_item) then
-			-- Swap
-			inventory_slot = get_inventory_position(active_item)
-			print(("Putting wand (%d) in storage"):format(active_item))
-			-- EntityRemoveFromParent(active_item)
-			put_wand_in_storage(active_item)
+		-- print(("active_item (%d)"):format(active_item))
+		-- If we're already holding 4 wands and have none selected, don't do anything, otherwise swap the held wand with the stored one
+		if not has_enough_space_for_wand() and active_item then
+			if not is_wand(active_item) then
+				return
+			else
+				-- Swap
+				inventory_slot = get_inventory_position(active_item)
+				print(("Putting wand (%d) in storage"):format(active_item))
+				-- EntityRemoveFromParent(active_item)
+				put_wand_in_storage(active_item)
+			end
 		end
 		local first_free_wand_slot = get_first_free_wand_slot()
 		-- Make sure we only pick up the wand if either we have a wand selected that we will swap with, or have enough space
 		if inventory_slot or first_free_wand_slot then
-
-			async(function()
-				local new_wand = deserialize_entity(wand.serialized_poly)
-				EntityKill(wand.container_entity_id)
-				-- "Pick up" wand and place it in inventory
-				local item_comp = EntityGetFirstComponentIncludingDisabled(new_wand, "ItemComponent")
-				ComponentSetValue2(item_comp, "is_pickable", true)
-				ComponentSetValue2(item_comp, "play_pick_sound", false)
-				ComponentSetValue2(item_comp, "next_frame_pickable", 0)
-				ComponentSetValue2(item_comp, "npc_next_frame_pickable", 0)
-				local new_slot = inventory_slot and inventory_slot or first_free_wand_slot
-				set_inventory_position(new_wand, new_slot)
-				EntityAddChild(inventory, new_wand)
-				-- /"Pick up" wand and place it in inventory
-
-				-- Scroll to new wand to select it
-				local player = EntityGetWithTag("player_unit")[1]
-				local controls_comp = EntityGetComponentIncludingDisabled(player, "ControlsComponent")[1]
-				-- EntitySetComponentIsEnabled(player, controls_comp, false)
-				ComponentSetValue2(controls_comp, "enabled", false)
-				-- Just to make sure this gets re-enabled even it a bug occurs in the code after this
-				async(function()
-					wait(0)
-					ComponentSetValue2(controls_comp, "enabled", true)
-				end)
-				local inventory_slots, active_item = get_inventory_and_active_item()
-				local active_item_item_comp = EntityGetFirstComponentIncludingDisabled(active_item, "ItemComponent")
-				local currently_selected_slot = ComponentGetValue2(active_item_item_comp, "inventory_slot")
-				if not is_wand(active_item) then
-					currently_selected_slot = currently_selected_slot + 4
-				end
-				-- Potions/Items start at 0, so add 4 to get the absolute position of the item in the inventory
-				-- local inv_count = #get_held_wands() + #get_held_items()
-				local change_amount = 0
-				for i=currently_selected_slot, currently_selected_slot+8 do
-					local slot_to_check = i % 8
-					print("Checking slot " .. tostring(slot_to_check))
-					if slot_to_check == new_slot then
-						print("Change amount found: " .. tostring(change_amount))
-						break
-					end
-					if inventory_slots[slot_to_check+1] then
-						print("inventory_slots[slot_to_check] ("..tostring(slot_to_check)..") exists, adding change_amount + 1")
-						change_amount = change_amount + 1
-					end
-				end
-				-- print("is_wand(active_item): " .. type(is_wand(active_item)) .. " - " .. tostring(is_wand(active_item)))
-				
-				-- if inventory_slot_x == nil then
-				-- 	change_amount = inv_count
-				-- elseif not is_wand(active_item) then
-				-- 	inventory_slot_x = inventory_slot_x + 4
-				-- end
-				-- if inventory_slot_x ~= nil then
-				-- 	change_amount = new_slot - inventory_slot_x
-				-- 	if change_amount < 0 then
-				-- 		-- Occupied: [0][ ][2][ ] [ ][1][ ][3]
-				-- 		-- Selected: 				^
-				-- 		-- Add wand to 1 ^
-				-- 		change_amount = change_amount + inv_count
-				-- 	end
-				-- end
-				print("change_amount: " .. type(change_amount) .. " - " .. tostring(change_amount))
-				ComponentSetValue2(controls_comp, "mButtonDownChangeItemR", true)
-				ComponentSetValue2(controls_comp, "mButtonFrameChangeItemR", GameGetFrameNum() + 1)
-				ComponentSetValue2(controls_comp, "mButtonCountChangeItemR", change_amount)
-				-- /Scroll to new wand to select it
-
-
-
-				-- wait(0)
-					-- print(tostring(get_active_item()))
-				-- end
-				-- local sprite = EntityGetFirstComponentIncludingDisabled(new_wand, "SpriteComponent", "enabled_in_hand")
-				-- if sprite then
-				-- 	EntityRefreshSprite(new_wand, sprite)
-				-- end
-
-
-
-
-
-
-				-- print("inventory: " .. type(inventory) .. " - " .. tostring(inventory))
-				-- print("new_wand: " .. type(new_wand) .. " - " .. tostring(new_wand))
-				-- print("inventory_slot: " .. type(inventory_slot) .. " - " .. tostring(inventory_slot))
-				-- print("first_free_wand_slot: " .. type(first_free_wand_slot) .. " - " .. tostring(first_free_wand_slot))
-				-- set_active_item(new_wand)
-			end)
-
-
-
+			create_and_pick_up_wand(wand.serialized_poly, inventory_slot or first_free_wand_slot)
+			-- create_and_pick_up_wand(wand.serialized_poly, first_free_wand_slot)
+			EntityKill(wand.container_entity_id)
 		end
 	end
 end
@@ -444,26 +524,6 @@ function retrieve_or_swap_item(item)
 			set_inventory_position(item, inventory_slot and inventory_slot or first_free_item_slot)
 		end
 	end
-end
-
-function retrieve_wand(wand)
-	async(function()
-		-- Create a new entity that will be reverse-polymorphed into the wand
-		local new_wand = EntityCreateNew()
-		-- Move it to a location where no other entities are, so we can get a reference to it with EntityGetInRadius
-		EntitySetTransform(new_wand, 6666666, 6666666)
-		-- Apply polymorph which, when it runs out after 1 frame will turn the entity back into it's original form, which we provide
-		polytools.load(new_wand, serialized)
-		-- Wait 1 frame for the polymorph to wear off
-		wait(0)
-		-- Entity should be ready to collect
-		new_wand = EntityGetInRadius(6666666, 6666666, 5)[1]
-		for i, v in ipairs(EntityGetInRadius(6666666, 6666666, 5)) do
-			print("i: " .. i)
-		end
-		local player = EntityGetWithTag("player_unit")[1]
-		GamePickUpInventoryItem(player, new_wand, false)
-	end)
 end
 
 --[[ 
@@ -538,20 +598,77 @@ function OnPlayerSpawned(player)
 	if wand_storage == 0 then
 		wand_storage = EntityCreateNew("wand_storage_container")
 		EntityAddChild(player, wand_storage)
-		for i=1, 4 do
-		-- for i=1, 15*4 do
-			local wand = EZWand()
-			wand.capacity = 26
-			wand:AddSpells("BOMB", 26)
-			put_wand_in_storage(wand.entity_id)
-			-- EntityAddChild(wand_storage, wand.entity_id)
-		end
+		-- for i=1, 4 do
+		-- -- for i=1, 15*4 do
+		-- 	local wand = EZWand()
+		-- 	wand.capacity = 26
+		-- 	wand:AddSpells("BOMB", 26)
+		-- 	put_wand_in_storage(wand.entity_id)
+		-- 	-- EntityAddChild(wand_storage, wand.entity_id)
+		-- end
 	end
 	local item_storage = EntityGetWithName("item_storage_container")
 	if item_storage == 0 then
 		item_storage = EntityCreateNew("item_storage_container")
 		EntityAddChild(player, item_storage)
 	end
+	-- Unit tests
+	function take_wand_out_and_put_it_back(slot)
+		local inventory, active_item = get_inventory_and_active_item()
+		put_wand_in_storage(inventory[slot], false)
+		-- wait(0) doesn't work because put_wand_in_storage spawns another async process which waits 2 frames?
+		wait(10)
+		-- wait(2)
+		local stored_wands = get_stored_wands()
+		-- local wand_storage = EntityGetWithName("wand_storage_container")
+		-- local wand_containers = EntityGetAllChildren(wand_storage) or {}
+		print("stored_wands[1]: " .. type(stored_wands[1]) .. " - " .. tostring(stored_wands[1]))
+		retrieve_or_swap_wand(stored_wands[1])
+	end
+
+	function print_entity(entity)
+		print("EntityName: " .. (EntityGetName(wand) or "nil"))
+		local ent_x, ent_y = EntityGetTransform(wand)
+		print("X, Y: " .. tostring(ent_x) .. ", " .. tostring(ent_y))
+		print("Components: ")
+		for i, v in ipairs(EntityGetAllComponents(wand) or {}) do
+			print(tostring(v))
+		end
+	end
+
+	async(function()
+		-- do return end
+		-- wait(60)
+		wait(5)
+		local x, y = EntityGetTransform(player)
+		local wand = EntityLoad("data/entities/items/wand_unshuffle_01.xml", x, y)
+		local serialized = polytools.save(wand)
+		EntitySave(wand, "xxx_immediately_after_polysave.xml")
+		print("Entity Debug print immediately after save:")
+		print_entity(wand)
+		wait(0)
+		print("Entity name 1 frame after polysave:")
+		print_entity(wand)
+		EntitySave(wand, "xxx_1_frame_after_polysave.xml")
+		-- local wand = deserialize_entity("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AAAPU3ByaXRlQ29tcG9uZW50AQEAAAAlZW5hYmxlZF9pbl93b3JsZCxlbmFibGVkX2luX2hhbmQsaXRlbQAAABpkYXRhL2l0ZW1zX2dmeC9oYW5kZ3VuLnhtbAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP4AAAAEAAAAAAAAAB2RlZmF1bHQAAAAAAAAAAD8YUewBAQAAP4AAAD+AAAAAAAAAEVZlbG9jaXR5Q29tcG9uZW50AQAAAAAQZW5hYmxlZF9pbl93b3JsZAAAAABDyAAAPUzMzT8MzM1EegAAAQEBAAEAAAAAP4AAAAAAAAAAAAAAAAAAAQAAAAAAAAAAKmRhdGEvZW50aXRpZXMvbWlzYy9jdXN0b21fY2FyZHMvYWN0aW9uLnhtbAAAAAtjYXJkX2FjdGlvbkNjAADCoc45P4AAAD+AAAAAAAAAAAAADAAAAA9IaXRib3hDb21wb25lbnQBAAAAABBlbmFibGVkX2luX3dvcmxkAAEAwIAAAECAAADAQAAAQEAAAAAAAAAAAAAAP4AAAAAAABNJdGVtQWN0aW9uQ29tcG9uZW50AQAAAAAQZW5hYmxlZF9pbl93b3JsZAAAAApCT1VOQ1lfT1JCAAAADUl0ZW1Db21wb25lbnQBAAAAABBlbmFibGVkX2luX3dvcmxkAAAAAAAAAQAA/////wAAAAAAAAAAAAEBQ2MAAMKhzjkAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAABkAAAAAAQBBYZmaQkgAAD+AAAAAAAAAAAAAABZTaW1wbGVQaHlzaWNzQ29tcG9uZW50AQAAAAAQZW5hYmxlZF9pbl93b3JsZAEAAAAPU3ByaXRlQ29tcG9uZW50AQAAAAAgZW5hYmxlZF9pbl93b3JsZCxpdGVtX2lkZW50aWZpZWQAAAAmZGF0YS91aV9nZngvZ3VuX2FjdGlvbnMvYm91bmN5X29yYi5wbmcAAEEAAABBiAAAAAAAAAAAAAAAAAAAAAAAAD+AAAABAAAAAAAAAAAAAAAAAAAAAD8YUewBAQAAP4AAAD+AAAAAAAAAD1Nwcml0ZUNvbXBvbmVudAEAAAAAImVuYWJsZWRfaW5fd29ybGQsaXRlbV91bmlkZW50aWZpZWQAAAAoZGF0YS91aV9nZngvZ3VuX2FjdGlvbnMvdW5pZGVudGlmaWVkLnBuZwAAQQAAAEGIAAAAAAAAAAAAAAAAAAAAAAAAP4AAAAEAAAAAAAAAAAAAAAAAAAAAPxhR7AEBAAA/gAAAP4AAAAAAAAAPU3ByaXRlQ29tcG9uZW50AQAAAAAYZW5hYmxlZF9pbl93b3JsZCxpdGVtX2JnAAAALGRhdGEvdWlfZ2Z4L2ludmVudG9yeS9pdGVtX2JnX3Byb2plY3RpbGUucG5nAABBIAAAQZgAAAAAAAAAAAAAAAAAAAAAAAA/gAAAAQAAAAAAAAAAAAAAAAAAAAA/GFHsAQEAAD+AAAA/gAAAAAAAAB1TcHJpdGVPZmZzZXRBbmltYXRvckNvbXBvbmVudAEAAAAAEGVuYWJsZWRfaW5fd29ybGQAAAAAAAAAAD+AAABAIAAAAAAAAEGAAAAAAAAAAAAAHVNwcml0ZU9mZnNldEFuaW1hdG9yQ29tcG9uZW50AQAAAAAQZW5hYmxlZF9pbl93b3JsZAAAAAAAAAAAP4AAAEAgAAAAAAABQYAAAAAAAAAAAAAdU3ByaXRlT2Zmc2V0QW5pbWF0b3JDb21wb25lbnQBAAAAABBlbmFibGVkX2luX3dvcmxkAAAAAAAAAAA/gAAAQCAAAAAAAAJBgAAAAAAAAAAAAB1TcHJpdGVPZmZzZXRBbmltYXRvckNvbXBvbmVudAEAAAAAEGVuYWJsZWRfaW5fd29ybGQAAAAAAAAAAD+AAABAIAAAAAAAA0GAAAAAAAAAAAAAEVZlbG9jaXR5Q29tcG9uZW50AQAAAAAQZW5hYmxlZF9pbl93b3JsZAAAAABDyAAAPUzMzT8MzM1EegAAAQEBAAEAAAAAP4AAAAAAAAAAAAAAAAAAAA==")
+		-- EntityApplyTransform(wand, 50, 50)
+		-- EntitySave(wand, "xxx.xml")
+		-- EZWand(wand):PutInPlayersInventory()
+		-- take_wand_out_and_put_it_back(1)
+		-- take_wand_out_and_put_it_back(2)
+		-- for i=1, 20 do
+		-- 	take_wand_out_and_put_it_back((i % 2) + 1)
+		-- 	wait(10)
+		-- end
+		-- for i=1, 4 do
+		-- 	-- for i=1, 15*4 do
+		-- 		local wand = EZWand()
+		-- 		wand.capacity = 26
+		-- 		wand:AddSpells("BOMB", 26)
+		-- 		put_wand_in_storage(wand.entity_id)
+		-- 		-- EntityAddChild(wand_storage, wand.entity_id)
+		-- 	end
+	end)
 end
 
 function is_inventory_open()
@@ -592,6 +709,47 @@ function OnWorldPreUpdate()
 	GuiStartFrame(gui)
 	GuiOptionsAdd(gui, GUI_OPTION.NoPositionTween)
 
+	GuiText(gui, 0, 300, "Active item:" .. tostring(get_active_item() or nil))
+
+	-- if GameGetFrameNum() == 60 then
+	-- 	async(function()
+	-- 		print("deserialized:" .. tostring(deserialized or nil))
+	-- 		local deserialized = deserialize_entity(undeserealizable_wand)
+	-- 	end)
+	-- end
+
+	-- if GameGetFrameNum() % 120 == 0 then
+	-- 	async(function()
+	-- 		local ent = EntityCreateNew()
+	-- 		EntitySetTransform(ent, 123456, 123456)
+	-- 		local shits = ("shit"):rep(1000)
+	-- 		EntityAddComponent2(ent, "VariableStorageComponent", {
+	-- 			name="shit",
+	-- 			value_string=shits
+	-- 		})
+	-- 		EntityAddComponent2(ent, "LuaComponent", {
+	-- 			script_source_file="mods/InventoryBags/print_location.lua",
+	-- 			execute_every_n_frame=30,
+	-- 		})
+	-- 		wait(20)
+	-- 		local serialized = polytools.save(ent)
+	-- 		-- if not fuckfuck then
+	-- 		-- 	fuckfuck = true
+	-- 		-- 	EntitySave(ent, "xxx.xml")
+	-- 		-- end
+	-- 		wait(5)
+	-- 		local all_entities = EntityGetInRadius(123456, 123456, 5)
+	-- 		assert(#all_entities == 1)
+	-- 		EntityKill(all_entities[1])
+	-- 		print("gotten_enty: " .. tostring(all_entities[1]))
+	-- 		local comp = EntityGetFirstComponentIncludingDisabled(ent, "VariableStorageComponent")
+	-- 		local val = ComponentGetValue2(comp, "value_string")
+	-- 		if val ~= shits then
+	-- 			-- print("ERROR!!!")
+	-- 		end
+	-- 	end)
+	-- end
+
 	if GuiButton(gui, 55595, 0, 200, "[ Click me :) ]") then
 		local inventory, active_item = get_inventory_and_active_item()
 		local str = ""
@@ -606,6 +764,7 @@ function OnWorldPreUpdate()
 			end
 			str = ("%s%s%s%s "):format(str, border[1], entity_id, border[2])
 		end
+		str = str .. " - active_item = " .. tostring(active_item)
 		print(str)
 	end
 
