@@ -351,8 +351,8 @@ function tooltipify_item(item)
 	end
 
 	local potion_color = GameGetPotionColorUint(item)
-	local tooltip = item_name .. "\n\n"
-	tooltip = tooltip .. description .. "\n"
+	local tooltip = item_name .. "\n \n"
+	tooltip = tooltip .. description .. "\n \n"
 	tooltip = tooltip .. material_inventory_lines
 	local image_file = ComponentGetValue2(item_component, "ui_sprite")
 	if ends_with(image_file, ".xml") then
@@ -688,11 +688,18 @@ function OnPlayerSpawned(player)
 			-- EntitySave(wand.entity_id, "xxx_shit_2.xml")
 			-- wand:PutInPlayersInventory()
 			wait(5)
-			for i=1, 4 do
+			for i=1, 20 do
 				local wand = EntityLoad("data/entities/items/wand_unshuffle_06.xml", 50 + i, 50)
 				GamePickUpInventoryItem(player, wand)
 				-- wand:PutInPlayersInventory()
 				put_wand_in_storage(wand)
+				wait(5)
+			end
+			for i=1, 20 do
+				local item = EntityLoad("data/entities/items/pickup/potion.xml", 50 + i, 50)
+				GamePickUpInventoryItem(player, item)
+				-- item:PutInPlayersInventory()
+				put_item_in_storage(item)
 				wait(5)
 			end
 		end)
@@ -780,6 +787,7 @@ function OnPausedChanged(is_paused, is_inventory_pause)
 end
 
 function OnWorldPreUpdate()
+	-- This is for making async functions work
 	wake_up_waiting_threads(1)
 	gui = gui or GuiCreate()
 	open = open or false
@@ -790,65 +798,6 @@ function OnWorldPreUpdate()
 	end
 	GuiStartFrame(gui)
 	GuiOptionsAdd(gui, GUI_OPTION.NoPositionTween)
-
-	GuiText(gui, 0, 300, "Active item:" .. tostring(get_active_item() or nil))
-
-	-- if GameGetFrameNum() == 60 then
-	-- 	async(function()
-	-- 		print("deserialized:" .. tostring(deserialized or nil))
-	-- 		local deserialized = deserialize_entity(undeserealizable_wand)
-	-- 	end)
-	-- end
-
-	-- if GameGetFrameNum() % 120 == 0 then
-	-- 	async(function()
-	-- 		local ent = EntityCreateNew()
-	-- 		EntitySetTransform(ent, 123456, 123456)
-	-- 		local shits = ("shit"):rep(1000)
-	-- 		EntityAddComponent2(ent, "VariableStorageComponent", {
-	-- 			name="shit",
-	-- 			value_string=shits
-	-- 		})
-	-- 		EntityAddComponent2(ent, "LuaComponent", {
-	-- 			script_source_file="mods/InventoryBags/print_location.lua",
-	-- 			execute_every_n_frame=30,
-	-- 		})
-	-- 		wait(20)
-	-- 		local serialized = polytools.save(ent)
-	-- 		-- if not fuckfuck then
-	-- 		-- 	fuckfuck = true
-	-- 		-- 	EntitySave(ent, "xxx.xml")
-	-- 		-- end
-	-- 		wait(5)
-	-- 		local all_entities = EntityGetInRadius(123456, 123456, 5)
-	-- 		assert(#all_entities == 1)
-	-- 		EntityKill(all_entities[1])
-	-- 		print("gotten_enty: " .. tostring(all_entities[1]))
-	-- 		local comp = EntityGetFirstComponentIncludingDisabled(ent, "VariableStorageComponent")
-	-- 		local val = ComponentGetValue2(comp, "value_string")
-	-- 		if val ~= shits then
-	-- 			-- print("ERROR!!!")
-	-- 		end
-	-- 	end)
-	-- end
-
-	if GuiButton(gui, 55595, 0, 200, "[ Click me :) ]") then
-		local inventory, active_item = get_inventory_and_active_item()
-		local str = ""
-		for i=1, 8 do
-			local entity_id = " "
-			local border = { "[", "]" }
-			if inventory[i] then
-				entity_id = inventory[i]
-				if inventory[i] == active_item then
-					border = { ">", "<" }
-				end
-			end
-			str = ("%s%s%s%s "):format(str, border[1], entity_id, border[2])
-		end
-		str = str .. " - active_item = " .. tostring(active_item)
-		print(str)
-	end
 
 	local inventory_open = is_inventory_open()
 	-- If button dragging is enabled in the settings and the inventory is not open, make it draggable
@@ -1044,8 +993,6 @@ function OnWorldPreUpdate()
 			GuiText(gui, 0, margin, string.format("%.1f DEG", wand.props.spread))
 			GuiLayoutEnd(gui)
 			GuiLayoutEnd(gui)
-			-- This runs every frame and is very inefficient, I know, but at least it's accurate, caching without detecting spell/wand changes correctly
-			-- could lead to incorrect tooltips
 			local spells = wand.spells
 			GuiLayoutBeginHorizontal(gui, spread_icon_x, spread_icon_y + spread_icon_height + 7, true)
 			local row = 0
@@ -1072,12 +1019,29 @@ function OnWorldPreUpdate()
 		end
 		-- Render a tooltip of the hovered item if we have any
 		if tooltip_item then
+
+
+			-- GuiText(gui, 0, 0, item_name)
+			-- for i, line in ipairs(description) do
+			-- 	GuiText(gui, 0, i == 1 and 7 or 0, line)
+			-- end
+			-- for i, line in ipairs(lines) do
+			-- 	GuiText(gui, 0, i == 1 and 7 or -1, line)
+			-- end
+
+
+
+
 			GuiBeginAutoBox(gui)
 			GuiLayoutBeginHorizontal(gui, origin_x + box_width + 20, origin_y + 5, true)
 			GuiLayoutBeginVertical(gui, 0, 0)
 			local lines = split_string(tooltip_item, "\n")
 			for i, line in ipairs(lines) do
-				GuiText(gui, 0, i == 1 and 7 or 0, line)
+				-- GuiText(gui, 0, 0, line)
+				local offset = line == " " and -7 or 0
+				GuiText(gui, 0, offset, line)
+				-- GuiText(gui, 0, i == 2 and -4 or 0, line)
+				-- GuiText(gui, 0, i == 1 and 7 or 0, line)
 			end
 			GuiLayoutEnd(gui)
 			GuiLayoutEnd(gui)
