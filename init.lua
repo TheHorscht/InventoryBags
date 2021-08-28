@@ -8,26 +8,37 @@ local polytools = dofile_once("mods/InventoryBags/lib/polytools/polytools.lua")
 local nxml = dofile_once("mods/InventoryBags/lib/nxml.lua")
 local EZWand = dofile_once("mods/InventoryBags/lib/EZWand.lua")
 
+function print() end
+
 local wait_ = wait
 function wait(t)
-	print(("wait(%s)"):format(t))
+	print(("wait(%s) %s"):format(t, coroutine.running()))
 	wait_(t)
 end
 
 local async_ = async
 function async(func)
-	if not async_running then
-		async_(function()
-			print("<Async>")
-			async_running = true
-			func()
-			print("</Async>")
-			async_running = false
-		end)
-	else
+	async_(function()
+		print(("<Async %s>"):format(coroutine.running()))
 		func()
-	end
+		print(("</Async %s>"):format(coroutine.running()))
+	end)
 end
+-- local asyncs_running = 0
+-- local async_ = async
+-- function async(func)
+-- 	if not async_running then
+-- 		async_(function()
+-- 			print("<Async>")
+-- 			async_running = true
+-- 			func()
+-- 			print("</Async>")
+-- 			async_running = false
+-- 		end)
+-- 	else
+-- 		func()
+-- 	end
+-- end
 
 local print_ = print
 function print(...)
@@ -235,8 +246,12 @@ end
 
 ---Needs to be called from inside an async function. Kills entity and returns the serialized string.
 function serialize_entity(entity, dont_kill)
+	if not coroutine.running() then
+		error("serialize_entity() must be called from inside an async function", 2)
+	end
 	print(("serialize_entity(%s) called"):format(entity))
 	-- EntitySetName(entity, "to_be_serialized")
+	EntityRemoveFromParent(entity)
 	EntityApplyTransform(entity, 6666666, 6666666)
 	-- EntitySave(entity, "xxx_serialized_" .. entity .. ".xml")
 	-- wait(0)
@@ -245,7 +260,6 @@ function serialize_entity(entity, dont_kill)
 	-- wait(0)
 	print("serialized hash = " .. sha1.hex(serialized):sub(1,8))
 	-- entity = EntityGetWithName("to_be_serialized")
-	local entity_before = entity
 	wait(0)
 	entity = EntityGetInRadius(6666666, 6666666, 5)[1]
 	-- if not deserialized then
@@ -266,27 +280,23 @@ function serialize_entity(entity, dont_kill)
 end
 
 function deserialize_entity(str)
+	if not coroutine.running() then
+		error("deserialize_entity() must be called from inside an async function", 2)
+	end
 	print(("deserialize_entity(%s) called"):format(sha1.hex(str):sub(1,8)))
-	local entity = EntityCreateNew()
 	-- Move the entity to a unique location so that we can get a reference to the entity with EntityGetInRadius once polymorph wears off
-	local temp_x, temp_y = 173, -135
-	EntityApplyTransform(entity, temp_x, temp_y)
+	polytools.spawn(666666, 666666, str)
 	-- EntityApplyTransform(entity, 6666666, 6666666)
 	-- local entity = EntityCreateNew("to_be_deserialized")
-	-- Apply polymorph which, when it runs out after 1 frame will turn the entity back into it's original form, which we provide
-	polytools.load(entity, str)
 	-- GameCreateSpriteForXFrames("data/debug/circle_16.png", 50, 50, true, 0, 0, 10000000)
 	-- Wait 1 frame for the polymorph to wear off
-	wait(5)
-	print(("Entity(%d) was deserialized. Name = %s"):format(entity, tostring(EntityGetName(entity) or nil)))
-	for i, comp in ipairs(EntityGetAllComponents(entity) or {}) do
-		print(ComponentGetTypeName(comp))
-	end
+	-- Apply polymorph which, when it runs out after 1 frame will turn the entity back into it's original form, which we provide
+	wait(0)
 	-- wait(1)
 	-- Entity should be ready to collect
 	-- entity = EntityGetWithName("to_be_deserialized")
 	-- EntitySetName(entity, "")
-	local all_entities = EntityGetInRadius(temp_x, temp_y, 5)
+	local all_entities = EntityGetInRadius(666666, 666666, 3)
 	-- EntityAddComponent2(all_entities[1], "SpriteComponent", { image_file = "data/debug/circle_16.png", offset_x = 8, offset_y = 8 })
 	-- EntitySave(all_entities[1], "xxx.xml")
 	-- local all_entities = EntityGetInRadius(6666666, 6666666, 5)
@@ -320,13 +330,12 @@ function create_storage_entity(ez, poly)
 	return entity
 end
 
-function put_wand_in_storage(wand, do_async)
-	do_async = do_async and true or false
+function put_wand_in_storage(wand)
 	print(("put_wand_in_storage(%s) called"):format(wand))
 	local player = EntityGetWithTag("player_unit")[1]
 	local wand_storage = EntityGetWithName("wand_storage_container")
 	if player and wand_storage > 0 then
-		local func = function()
+		async(function()
 			-- EntitySetComponentsWithTagEnabled(wand, "enabled_in_world", false)
 			-- EntitySetComponentsWithTagEnabled(wand, "enabled_in_hand", false)
 			local ez = EZWand(wand):Serialize()
@@ -334,12 +343,7 @@ function put_wand_in_storage(wand, do_async)
 			local new_entry = create_storage_entity(ez, poly)
 			-- print(("Adding (%d) to (%d)"):format(wand_storage, new_entry))
 			EntityAddChild(wand_storage, new_entry)
-		end
-		if do_async then
-			async(func)
-		else
-			func()
-		end
+		end)
 
 	-- 	local inventory2 = EntityGetFirstComponentIncludingDisabled(player, "Inventory2Component")
 	-- 	local mActiveItem = ComponentGetValue2(inventory2, "mActiveItem")
@@ -418,7 +422,7 @@ function create_and_pick_up_wand(serialized, slot)
 	async(function()
 		local new_wand = deserialize_entity(serialized)
 		if not new_wand then
-			print("NO WAND: " .. tostring(serialized))
+			print("NO WAND!!")
 		end
 		-- "Pick up" wand and place it in inventory
 		local item_comp = EntityGetFirstComponentIncludingDisabled(new_wand, "ItemComponent")
@@ -437,6 +441,7 @@ function create_and_pick_up_wand(serialized, slot)
 		ComponentSetValue2(item_comp, "npc_next_frame_pickable", 0)
 		local first_free_wand_slot = get_first_free_wand_slot()
 		local new_slot = slot and slot or first_free_wand_slot
+		GamePickUpInventoryItem(EntityGetWithTag("player_unit")[1], new_wand)
 		set_inventory_position(new_wand, new_slot)
 		local inventory = get_inventory()
 		EntityAddChild(inventory, new_wand)
@@ -475,7 +480,7 @@ end
 -- When taking it out without having an existing active item == FAIL
 
 function retrieve_or_swap_wand(wand)
-	print(("retrieve_or_swap_wand(%s) called (table poly extracted)"):format(sha1.hex(wand.serialized_poly):sub(1,8)))
+	-- print(("retrieve_or_swap_wand(%s) called (table poly extracted)"):format(sha1.hex(wand.serialized_poly):sub(1,8)))
 	local inventory = get_inventory()
 	if inventory > 0 then
 		local active_item = get_active_item()
@@ -598,14 +603,25 @@ function OnPlayerSpawned(player)
 	if wand_storage == 0 then
 		wand_storage = EntityCreateNew("wand_storage_container")
 		EntityAddChild(player, wand_storage)
-		-- for i=1, 4 do
-		-- -- for i=1, 15*4 do
-		-- 	local wand = EZWand()
-		-- 	wand.capacity = 26
-		-- 	wand:AddSpells("BOMB", 26)
-		-- 	put_wand_in_storage(wand.entity_id)
-		-- 	-- EntityAddChild(wand_storage, wand.entity_id)
-		-- end
+		async(function()
+			-- local wand = EZWand()
+			-- wand.capacity = 26
+			-- wand:AddSpells("BOMB", 6)
+			-- GamePickUpInventoryItem(player, wand.entity_id)
+			-- wait(0)
+			-- EntitySave(wand.entity_id, "xxx_shit_1.xml")
+
+			-- EntitySave(wand.entity_id, "xxx_shit_2.xml")
+			-- wand:PutInPlayersInventory()
+			wait(5)
+			for i=1, 4 do
+				local wand = EntityLoad("data/entities/items/wand_unshuffle_06.xml", 50 + i, 50)
+				GamePickUpInventoryItem(player, wand)
+				-- wand:PutInPlayersInventory()
+				put_wand_in_storage(wand)
+				wait(5)
+			end
+		end)
 	end
 	local item_storage = EntityGetWithName("item_storage_container")
 	if item_storage == 0 then
@@ -639,23 +655,15 @@ function OnPlayerSpawned(player)
 	async(function()
 		-- do return end
 		-- wait(60)
-		wait(5)
-		local x, y = EntityGetTransform(player)
-		local wand = EntityLoad("data/entities/items/wand_unshuffle_01.xml", x, y)
-		local serialized = polytools.save(wand)
-		EntitySave(wand, "xxx_immediately_after_polysave.xml")
-		print("Entity Debug print immediately after save:")
-		print_entity(wand)
-		wait(0)
-		print("Entity name 1 frame after polysave:")
-		print_entity(wand)
-		EntitySave(wand, "xxx_1_frame_after_polysave.xml")
+		do return end
+		wait(60)
 		-- local wand = deserialize_entity("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AAAPU3ByaXRlQ29tcG9uZW50AQEAAAAlZW5hYmxlZF9pbl93b3JsZCxlbmFibGVkX2luX2hhbmQsaXRlbQAAABpkYXRhL2l0ZW1zX2dmeC9oYW5kZ3VuLnhtbAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP4AAAAEAAAAAAAAAB2RlZmF1bHQAAAAAAAAAAD8YUewBAQAAP4AAAD+AAAAAAAAAEVZlbG9jaXR5Q29tcG9uZW50AQAAAAAQZW5hYmxlZF9pbl93b3JsZAAAAABDyAAAPUzMzT8MzM1EegAAAQEBAAEAAAAAP4AAAAAAAAAAAAAAAAAAAQAAAAAAAAAAKmRhdGEvZW50aXRpZXMvbWlzYy9jdXN0b21fY2FyZHMvYWN0aW9uLnhtbAAAAAtjYXJkX2FjdGlvbkNjAADCoc45P4AAAD+AAAAAAAAAAAAADAAAAA9IaXRib3hDb21wb25lbnQBAAAAABBlbmFibGVkX2luX3dvcmxkAAEAwIAAAECAAADAQAAAQEAAAAAAAAAAAAAAP4AAAAAAABNJdGVtQWN0aW9uQ29tcG9uZW50AQAAAAAQZW5hYmxlZF9pbl93b3JsZAAAAApCT1VOQ1lfT1JCAAAADUl0ZW1Db21wb25lbnQBAAAAABBlbmFibGVkX2luX3dvcmxkAAAAAAAAAQAA/////wAAAAAAAAAAAAEBQ2MAAMKhzjkAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAABkAAAAAAQBBYZmaQkgAAD+AAAAAAAAAAAAAABZTaW1wbGVQaHlzaWNzQ29tcG9uZW50AQAAAAAQZW5hYmxlZF9pbl93b3JsZAEAAAAPU3ByaXRlQ29tcG9uZW50AQAAAAAgZW5hYmxlZF9pbl93b3JsZCxpdGVtX2lkZW50aWZpZWQAAAAmZGF0YS91aV9nZngvZ3VuX2FjdGlvbnMvYm91bmN5X29yYi5wbmcAAEEAAABBiAAAAAAAAAAAAAAAAAAAAAAAAD+AAAABAAAAAAAAAAAAAAAAAAAAAD8YUewBAQAAP4AAAD+AAAAAAAAAD1Nwcml0ZUNvbXBvbmVudAEAAAAAImVuYWJsZWRfaW5fd29ybGQsaXRlbV91bmlkZW50aWZpZWQAAAAoZGF0YS91aV9nZngvZ3VuX2FjdGlvbnMvdW5pZGVudGlmaWVkLnBuZwAAQQAAAEGIAAAAAAAAAAAAAAAAAAAAAAAAP4AAAAEAAAAAAAAAAAAAAAAAAAAAPxhR7AEBAAA/gAAAP4AAAAAAAAAPU3ByaXRlQ29tcG9uZW50AQAAAAAYZW5hYmxlZF9pbl93b3JsZCxpdGVtX2JnAAAALGRhdGEvdWlfZ2Z4L2ludmVudG9yeS9pdGVtX2JnX3Byb2plY3RpbGUucG5nAABBIAAAQZgAAAAAAAAAAAAAAAAAAAAAAAA/gAAAAQAAAAAAAAAAAAAAAAAAAAA/GFHsAQEAAD+AAAA/gAAAAAAAAB1TcHJpdGVPZmZzZXRBbmltYXRvckNvbXBvbmVudAEAAAAAEGVuYWJsZWRfaW5fd29ybGQAAAAAAAAAAD+AAABAIAAAAAAAAEGAAAAAAAAAAAAAHVNwcml0ZU9mZnNldEFuaW1hdG9yQ29tcG9uZW50AQAAAAAQZW5hYmxlZF9pbl93b3JsZAAAAAAAAAAAP4AAAEAgAAAAAAABQYAAAAAAAAAAAAAdU3ByaXRlT2Zmc2V0QW5pbWF0b3JDb21wb25lbnQBAAAAABBlbmFibGVkX2luX3dvcmxkAAAAAAAAAAA/gAAAQCAAAAAAAAJBgAAAAAAAAAAAAB1TcHJpdGVPZmZzZXRBbmltYXRvckNvbXBvbmVudAEAAAAAEGVuYWJsZWRfaW5fd29ybGQAAAAAAAAAAD+AAABAIAAAAAAAA0GAAAAAAAAAAAAAEVZlbG9jaXR5Q29tcG9uZW50AQAAAAAQZW5hYmxlZF9pbl93b3JsZAAAAABDyAAAPUzMzT8MzM1EegAAAQEBAAEAAAAAP4AAAAAAAAAAAAAAAAAAAA==")
 		-- EntityApplyTransform(wand, 50, 50)
 		-- EntitySave(wand, "xxx.xml")
 		-- EZWand(wand):PutInPlayersInventory()
-		-- take_wand_out_and_put_it_back(1)
-		-- take_wand_out_and_put_it_back(2)
+		take_wand_out_and_put_it_back(1)
+		wait(1)
+		take_wand_out_and_put_it_back(2)
 		-- for i=1, 20 do
 		-- 	take_wand_out_and_put_it_back((i % 2) + 1)
 		-- 	wait(10)

@@ -68,7 +68,7 @@ function polytools.save(target) return polytools.hide(target, 1).GameEffectCompo
 ---@param b2 utf8*
 ---@param b3 utf8*
 ---@param b4 utf8*
----@param big_endian bool
+---@param big_endian boolean
 ---@return int
 local function BytesToInt(b1, b2, b3, b4, big_endian)
     if big_endian then
