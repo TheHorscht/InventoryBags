@@ -124,7 +124,7 @@ function get_held_wands()
 				local sprite_component = EntityGetFirstComponentIncludingDisabled(wand, "SpriteComponent")
 				local image_file = ComponentGetValue2(sprite_component, "image_file")
 				if ends_with(image_file, ".xml") then
-					image_file = get_wand_xml_sprite(image_file)
+					image_file = get_xml_sprite(image_file)
 				end
 				table.insert(wands, {
 					entity_id = wand,
@@ -150,7 +150,7 @@ function get_held_items()
 				local item_component = EntityGetFirstComponentIncludingDisabled(item, "ItemComponent")
 				local image_file = ComponentGetValue2(item_component, "ui_sprite")
 				if ends_with(image_file, ".xml") then
-					image_file = get_wand_xml_sprite(image_file)
+					image_file = get_xml_sprite(image_file)
 				end
 				table.insert(items, {
 					entity_id = item,
@@ -182,12 +182,9 @@ function get_stored_wands()
 			end
 			local wand = EZWand.Deserialize(serialized_ez)
 			if ends_with(wand.sprite_image_file, ".xml") then
-				wand.sprite_image_file = get_wand_xml_sprite(wand.sprite_image_file)
+				wand.sprite_image_file = get_xml_sprite(wand.sprite_image_file)
 			end
 			wand.container_entity_id = container_entity_id
-			-- if string.len(serialized_poly) < 5 then
-			-- 	print("FUCK UP")
-			-- end
 			wand.serialized_poly = serialized_poly
 			serialized_wands[i] = wand
 		end
@@ -197,37 +194,35 @@ function get_stored_wands()
 	end
 end
 
---[[ 
-
-  <ItemComponent
-    _tags="enabled_in_world"
-    item_name="$item_potion"
-    max_child_items="0"
-    is_pickable="1"
-    is_equipable_forced="1"
-    ui_sprite="data/ui_gfx/items/potion.png"
-    ui_description="$item_description_potion"
-    preferred_inventory="QUICK"
-  ></ItemComponent>
-
- ]]
-
 function get_stored_items()
 	local item_storage = EntityGetWithName("item_storage_container")
 	if item_storage > 0 then
-		local items = EntityGetAllChildren(item_storage) or {}
-		for i, item in ipairs(items) do
-			local item_component = EntityGetFirstComponentIncludingDisabled(item, "ItemComponent")
-			local image_file = ComponentGetValue2(item_component, "ui_sprite")
-			if ends_with(image_file, ".xml") then
-				image_file = get_wand_xml_sprite(image_file)
+		local serialized_items = EntityGetAllChildren(item_storage) or {}
+		for i, container_entity_id in ipairs(serialized_items) do
+			local image_file, potion_color, tooltip, serialized_poly
+			for i, comp in ipairs(EntityGetComponentIncludingDisabled(container_entity_id, "VariableStorageComponent")) do
+				if ComponentGetValue2(comp, "name") == "serialized_image_file" then
+					image_file = ComponentGetValue2(comp, "value_string")
+				end
+				if ComponentGetValue2(comp, "name") == "serialized_potion_color" then
+					potion_color = ComponentGetValue2(comp, "value_int")
+				end
+				if ComponentGetValue2(comp, "name") == "serialized_tooltip" then
+					tooltip = ComponentGetValue2(comp, "value_string")
+				end
+				if ComponentGetValue2(comp, "name") == "serialized_poly" then
+					serialized_poly = ComponentGetValue2(comp, "value_string")
+				end
 			end
-			items[i] = {
-				entity_id = item,
-				image_file = image_file
-			}
+			local item = {}
+			item.container_entity_id = container_entity_id
+			item.serialized_poly = serialized_poly
+			item.image_file = image_file
+			item.potion_color = potion_color
+			item.tooltip = tooltip
+			serialized_items[i] = item
 		end
-		return items
+		return serialized_items
 	else
 		return {}
 	end
@@ -244,38 +239,17 @@ function string_match_percent(ser1, ser2)
   return character_match_amount / longest_length
 end
 
----Needs to be called from inside an async function. Kills entity and returns the serialized string.
+---Needs to be called from inside an async function. Kills entity and returns the serialized string after 1 frame.
 function serialize_entity(entity, dont_kill)
 	if not coroutine.running() then
 		error("serialize_entity() must be called from inside an async function", 2)
 	end
-	print(("serialize_entity(%s) called"):format(entity))
-	-- EntitySetName(entity, "to_be_serialized")
 	EntityRemoveFromParent(entity)
 	EntityApplyTransform(entity, 6666666, 6666666)
-	-- EntitySave(entity, "xxx_serialized_" .. entity .. ".xml")
-	-- wait(0)
 	local serialized = polytools.save(entity)
-	-- Wait until polymorph wears off so we can kill the entity
-	-- wait(0)
-	print("serialized hash = " .. sha1.hex(serialized):sub(1,8))
-	-- entity = EntityGetWithName("to_be_serialized")
 	wait(0)
 	entity = EntityGetInRadius(6666666, 6666666, 5)[1]
-	-- if not deserialized then
-	-- local deserialized = deserialize_entity(serialized)
-	-- 	print("Entity was UNDESERIALIZABLE!!!!!")
-	-- 	print("> entity_before: " .. tostring(entity_before))
-	-- 	print("> entity: ".. tostring(entity))
-	-- 	print("> serialized: " .. sha1.hex(serialized):sub(1,8))
-	-- 	if EntityGetName(entity_before) == "polytools" then
-	-- 		print("Name is polytools")
-	-- 	end
-	-- 	EntitySave(entity_before, "xxx.xml")
-	-- else
-		if not dont_kill then EntityKill(entity) end
-		-- EntityKill(entity)
-	-- end
+	if not dont_kill then EntityKill(entity) end
 	return serialized
 end
 
@@ -283,41 +257,17 @@ function deserialize_entity(str)
 	if not coroutine.running() then
 		error("deserialize_entity() must be called from inside an async function", 2)
 	end
-	print(("deserialize_entity(%s) called"):format(sha1.hex(str):sub(1,8)))
 	-- Move the entity to a unique location so that we can get a reference to the entity with EntityGetInRadius once polymorph wears off
-	polytools.spawn(666666, 666666, str)
-	-- EntityApplyTransform(entity, 6666666, 6666666)
-	-- local entity = EntityCreateNew("to_be_deserialized")
-	-- GameCreateSpriteForXFrames("data/debug/circle_16.png", 50, 50, true, 0, 0, 10000000)
-	-- Wait 1 frame for the polymorph to wear off
 	-- Apply polymorph which, when it runs out after 1 frame will turn the entity back into it's original form, which we provide
+	polytools.spawn(666666, 666666, str)
+	-- Wait 1 frame for the polymorph to wear off
 	wait(0)
-	-- wait(1)
-	-- Entity should be ready to collect
-	-- entity = EntityGetWithName("to_be_deserialized")
-	-- EntitySetName(entity, "")
 	local all_entities = EntityGetInRadius(666666, 666666, 3)
-	-- EntityAddComponent2(all_entities[1], "SpriteComponent", { image_file = "data/debug/circle_16.png", offset_x = 8, offset_y = 8 })
-	-- EntitySave(all_entities[1], "xxx.xml")
-	-- local all_entities = EntityGetInRadius(6666666, 6666666, 5)
-	-- assert(#all_entities == 1, "Found entites was not 1, was: " .. tostring(#all_entities))
-	-- entity = all_entities[1]
-	-- local serialized = serialize_entity(entity, true)
-	-- wait(0)
-	-- local match_percent = string_match_percent(serialized, str)
-	-- assert(match_percent > 0.9, tostring(match_percent))
-	-- -- Move them out of the way so they can't be detected again
-	-- EntityApplyTransform(entity, 50, 50)
-	-- EntityApplyTransform(entity, 5555555, 5555555)
-	-- for i, w in ipairs(wands) do
-	-- 	EntitySave(w, "xxx" .. i .. ".xml")
-	-- end
-	-- print(#wands)
 	return all_entities[1]
 end
 
 function create_storage_entity(ez, poly)
-	print(("create_storage_entity(%s, %s) called"):format(ez, sha1.hex(poly):sub(1,8)))
+	-- print(("create_storage_entity(%s, %s) called"):format(ez, sha1.hex(poly):sub(1,8)))
 	local entity = EntityCreateNew()
 	EntityAddComponent2(entity, "VariableStorageComponent", {
 		name = "serialized_ez",
@@ -330,29 +280,85 @@ function create_storage_entity(ez, poly)
 	return entity
 end
 
+function create_item_storage_entity(image_file, potion_color, tooltip, poly)
+	-- print(("create_storage_entity(%s, %s) called"):format(ez, sha1.hex(poly):sub(1,8)))
+	local entity = EntityCreateNew()
+	EntityAddComponent2(entity, "VariableStorageComponent", {
+		name = "serialized_image_file",
+		value_string = image_file
+	})
+	EntityAddComponent2(entity, "VariableStorageComponent", {
+		name = "serialized_potion_color",
+		value_int = potion_color
+	})
+	EntityAddComponent2(entity, "VariableStorageComponent", {
+		name = "serialized_tooltip",
+		value_string = tooltip
+	})
+	EntityAddComponent2(entity, "VariableStorageComponent", {
+		name = "serialized_poly",
+		value_string = poly
+	})
+	return entity
+end
+
 function put_wand_in_storage(wand)
-	print(("put_wand_in_storage(%s) called"):format(wand))
 	local player = EntityGetWithTag("player_unit")[1]
 	local wand_storage = EntityGetWithName("wand_storage_container")
 	if player and wand_storage > 0 then
 		async(function()
-			-- EntitySetComponentsWithTagEnabled(wand, "enabled_in_world", false)
-			-- EntitySetComponentsWithTagEnabled(wand, "enabled_in_hand", false)
 			local ez = EZWand(wand):Serialize()
 			local poly = serialize_entity(wand)
 			local new_entry = create_storage_entity(ez, poly)
-			-- print(("Adding (%d) to (%d)"):format(wand_storage, new_entry))
 			EntityAddChild(wand_storage, new_entry)
 		end)
-
-	-- 	local inventory2 = EntityGetFirstComponentIncludingDisabled(player, "Inventory2Component")
-	-- 	local mActiveItem = ComponentGetValue2(inventory2, "mActiveItem")
-	-- 	EntityRemoveFromParent(wand)
-	-- 	EntityAddChild(wand_storage, wand)
-	-- 	if wand == mActiveItem then
-	-- 		ComponentSetValue2(inventory2, "mActiveItem", 0)
-	-- 	end
 	end
+end
+
+function tooltipify_item(item)
+	local ability_component = EntityGetFirstComponentIncludingDisabled(item, "AbilityComponent")
+	local item_component = EntityGetFirstComponentIncludingDisabled(item, "ItemComponent")
+	local potion_component = EntityGetFirstComponentIncludingDisabled(item, "PotionComponent")
+	local description = ComponentGetValue2(item_component, "ui_description")
+	description = GameTextGetTranslatedOrNot(description)
+	local material_inventory_lines = ""
+	local item_name = ComponentGetValue2(ability_component, "ui_name")
+	-- Item name is either stored on AbilityComponent:ui_name or if that doesn't exist, ItemComponent:item_name
+	if not item_name then
+		item_name = ComponentGetValue2(item_component, "item_name")
+	end
+	if potion_component then
+		local main_material_id = GetMaterialInventoryMainMaterial(item)
+		local main_material = CellFactory_GetUIName(main_material_id)
+		main_material = GameTextGetTranslatedOrNot(main_material)
+		local material_inventory_component = EntityGetFirstComponentIncludingDisabled(item, "MaterialInventoryComponent")
+		local material_sucker_component = EntityGetFirstComponentIncludingDisabled(item, "MaterialSuckerComponent")
+		local barrel_size = ComponentGetValue2(material_sucker_component, "barrel_size")
+		local count_per_material_type = ComponentGetValue2(material_inventory_component, "count_per_material_type")
+		local total_amount = 0
+		for material_id, amount in pairs(count_per_material_type) do
+			if amount > 0 then
+				total_amount = total_amount + amount
+				local material_name = CellFactory_GetUIName(material_id-1)
+				material_name = GameTextGetTranslatedOrNot(material_name)
+				material_inventory_lines = material_inventory_lines .. ("%s (%d)"):format(material_name:gsub("^%l", string.upper), amount) .. "\n"
+			end
+		end
+		local fill_percent = math.ceil((total_amount / barrel_size) * 100)
+		item_name = (GameTextGet(item_name, main_material) .. GameTextGet("$item_potion_fullness", fill_percent)):upper()
+	else
+		item_name = GameTextGetTranslatedOrNot(item_name):upper()
+	end
+
+	local potion_color = GameGetPotionColorUint(item)
+	local tooltip = item_name .. "\n\n"
+	tooltip = tooltip .. description .. "\n"
+	tooltip = tooltip .. material_inventory_lines
+	local image_file = ComponentGetValue2(item_component, "ui_sprite")
+	if ends_with(image_file, ".xml") then
+		image_file = get_xml_sprite(image_file)
+	end
+	return image_file, potion_color, tooltip
 end
 
 function put_item_in_storage(item)
@@ -360,13 +366,12 @@ function put_item_in_storage(item)
 	local num_items_stored = #(EntityGetAllChildren(item_storage) or {})
 	local player = EntityGetWithTag("player_unit")[1]
 	if player and item_storage > 0 then
-		local inventory2 = EntityGetFirstComponentIncludingDisabled(player, "Inventory2Component")
-		local mActiveItem = ComponentGetValue2(inventory2, "mActiveItem")
-		EntityRemoveFromParent(item)
-		EntityAddChild(item_storage, item)
-		if item == mActiveItem then
-			ComponentSetValue2(inventory2, "mActiveItem", 0)
-		end
+		local image_file, potion_color, tooltip = tooltipify_item(item)
+		async(function()
+			local poly = serialize_entity(item)
+			local new_entry = create_item_storage_entity(image_file, potion_color ,tooltip, poly)
+			EntityAddChild(item_storage, new_entry)
+		end)
 	end
 end
 
@@ -477,6 +482,66 @@ function create_and_pick_up_wand(serialized, slot)
 	end)
 end
 
+function create_and_pick_up_item(serialized, slot)
+	print(("create_and_pick_up_item(%s, %s) called"):format(sha1.hex(serialized):sub(1,8), slot))
+	async(function()
+		local new_item = deserialize_entity(serialized)
+		if not new_item then
+			print("NO item!!")
+		end
+		-- "Pick up" item and place it in inventory
+		local item_comp = EntityGetFirstComponentIncludingDisabled(new_item, "ItemComponent")
+		if not item_comp then
+			wait(0)
+			print("new_item: " .. tostring(new_item))
+			print("no item comp, saving entity as xxx.xml " .. tostring(EntityGetName(new_item) or nil))
+			EntitySave(new_item, "xxx.xml")
+			for i, comp in ipairs(EntityGetAllComponents(new_item)) do
+				print(ComponentGetTypeName(comp))
+			end
+		end
+		ComponentSetValue2(item_comp, "is_pickable", true)
+		ComponentSetValue2(item_comp, "play_pick_sound", false)
+		ComponentSetValue2(item_comp, "next_frame_pickable", 0)
+		ComponentSetValue2(item_comp, "npc_next_frame_pickable", 0)
+		local first_free_item_slot = get_first_free_item_slot()
+		local new_slot = slot and slot or first_free_item_slot
+		GamePickUpInventoryItem(EntityGetWithTag("player_unit")[1], new_item)
+		set_inventory_position(new_item, new_slot)
+		local inventory = get_inventory()
+		EntityAddChild(inventory, new_item)
+		-- /"Pick up" item and place it in inventory
+		do return end
+		-- Scroll to new item to select it
+		local inventory_slots, active_item = get_inventory_and_active_item()
+		local active_item_item_comp = EntityGetFirstComponentIncludingDisabled(active_item, "ItemComponent")
+		local currently_selected_slot = ComponentGetValue2(active_item_item_comp, "inventory_slot")
+		print("active_item: " .. type(active_item) .. " - " .. tostring(active_item))
+		if not active_item then
+			currently_selected_slot = 0
+		elseif not is_wand(active_item) then
+			currently_selected_slot = currently_selected_slot + 4
+		end
+		-- Potions/Items start at 0, so add 4 to get the absolute position of the item in the inventory
+		-- local inv_count = #get_held_wands() + #get_held_items()
+		local change_amount = 0
+		for i=currently_selected_slot, currently_selected_slot+8 do
+			local slot_to_check = i % 8
+			print("Checking slot " .. tostring(slot_to_check))
+			if slot_to_check == new_slot then
+				print("Change amount found: " .. tostring(change_amount))
+				break
+			end
+			if inventory_slots[slot_to_check+1] then
+				print("inventory_slots[slot_to_check] ("..tostring(slot_to_check)..") exists, adding change_amount + 1")
+				change_amount = change_amount + 1
+			end
+		end
+		scroll_inventory(change_amount)
+		-- /Scroll to new item to select it
+	end)
+end
+
 -- When taking it out without having an existing active item == FAIL
 
 function retrieve_or_swap_wand(wand)
@@ -514,19 +579,28 @@ function retrieve_or_swap_item(item)
 	if inventory > 0 and item_storage > 0 then
 		local active_item = get_active_item()
 		local inventory_slot
-		if not has_enough_space_for_item() and active_item and is_item(active_item) then
-			-- Swap
-			inventory_slot = get_inventory_position(active_item)
-			EntityRemoveFromParent(active_item)
-			EntityAddChild(item_storage, active_item)
+		if not has_enough_space_for_item() and active_item then
+			if is_wand(active_item) then
+				return
+			else
+				-- Swap
+				inventory_slot = get_inventory_position(active_item)
+				-- EntityRemoveFromParent(active_item)
+				put_item_in_storage(active_item)
+			end
 		end
 		local first_free_item_slot = get_first_free_item_slot()
 		-- Make sure we only pick up the item if either we have an item selected that we will swap with, or have enough space
+		-- if inventory_slot or first_free_item_slot then
+		-- 	EntityRemoveFromParent(item)
+		-- 	EntityAddChild(inventory, item)
+		-- 	set_active_item(item)
+		-- 	set_inventory_position(item, inventory_slot and inventory_slot or first_free_item_slot)
+		-- end
 		if inventory_slot or first_free_item_slot then
-			EntityRemoveFromParent(item)
-			EntityAddChild(inventory, item)
-			set_active_item(item)
-			set_inventory_position(item, inventory_slot and inventory_slot or first_free_item_slot)
+			create_and_pick_up_item(item.serialized_poly, inventory_slot or first_free_wand_slot)
+			-- create_and_pick_up_wand(wand.serialized_poly, first_free_wand_slot)
+			EntityKill(item.container_entity_id)
 		end
 	end
 end
@@ -589,7 +663,7 @@ end
 
 local sprite_xml_path_cache = {}
 local _ModTextFileGetContent = ModTextFileGetContent
-function get_wand_xml_sprite(sprite_xml_path)
+function get_xml_sprite(sprite_xml_path)
 	if sprite_xml_path_cache[sprite_xml_path] then
 		return sprite_xml_path_cache[sprite_xml_path]
 	end
@@ -825,7 +899,6 @@ function OnWorldPreUpdate()
 				local scale = hovered and 1.2 or 1
 				if hovered then
 					tooltip_wand = EZWand.Deserialize(EZWand(wand.entity_id):Serialize()) --wand.entity_id
-					GamePrint(wand.entity_id)
 				end
 				GuiZSetForNextWidget(gui, -9)
 				if wand.active then
@@ -877,8 +950,8 @@ function OnWorldPreUpdate()
 				local w, h = GuiGetImageDimensions(gui, item.image_file, 1)
 				local scale = hovered and 1.2 or 1
 				if hovered then
-					tooltip_item = item.entity_id
-					GamePrint(item.entity_id)
+					local image_file, potion_color, tooltip = tooltipify_item(item.entity_id)
+					tooltip_item = tooltip
 				end
 				GuiZSetForNextWidget(gui, -9)
 				if item.active then
@@ -905,16 +978,16 @@ function OnWorldPreUpdate()
 				local item = stored_items[(iy*4 + ix) + 1]
 				if item then
 					if GuiImageButton(gui, new_id(), origin_x + slot_margin + ix * slot_width_total, origin_y + spacer + slot_margin + slot_height_total + iy * slot_height_total, "", "data/ui_gfx/inventory/inventory_box.png") then
-						retrieve_or_swap_item(item.entity_id)
+						retrieve_or_swap_item(item)
 					end
 					local _, _, hovered, x, y, width, height = GuiGetPreviousWidgetInfo(gui)
 					local w, h = GuiGetImageDimensions(gui, item.image_file, 1)
 					local scale = hovered and 1.2 or 1
 					if hovered then
-						tooltip_item = item.entity_id
+						tooltip_item = item.tooltip
 					end
 					GuiZSetForNextWidget(gui, -10)
-					local potion_color = GameGetPotionColorUint(item.entity_id)
+					local potion_color = item.potion_color
 					if potion_color ~= 0 then
 						local b = bit.rshift(bit.band(potion_color, 0xFF0000), 16) / 0xFF
 						local g = bit.rshift(bit.band(potion_color, 0xFF00), 8) / 0xFF
@@ -999,49 +1072,12 @@ function OnWorldPreUpdate()
 		end
 		-- Render a tooltip of the hovered item if we have any
 		if tooltip_item then
-			local ability_component = EntityGetFirstComponentIncludingDisabled(tooltip_item, "AbilityComponent")
-			local item_component = EntityGetFirstComponentIncludingDisabled(tooltip_item, "ItemComponent")
-			local potion_component = EntityGetFirstComponentIncludingDisabled(tooltip_item, "PotionComponent")
-			local description = ComponentGetValue2(item_component, "ui_description")
-			description = GameTextGetTranslatedOrNot(description)
-			description = split_string(description, "\n")
-			local lines = {}
-			local item_name = ComponentGetValue2(ability_component, "ui_name")
-			-- Item name is either stored on AbilityComponent:ui_name or if that doesn't exist, ItemComponent:item_name
-			if not item_name then
-				item_name = ComponentGetValue2(item_component, "item_name")
-			end
-			if potion_component then
-				local main_material_id = GetMaterialInventoryMainMaterial(tooltip_item)
-				local main_material = CellFactory_GetUIName(main_material_id)
-				main_material = GameTextGetTranslatedOrNot(main_material)
-				local material_inventory_component = EntityGetFirstComponentIncludingDisabled(tooltip_item, "MaterialInventoryComponent")
-				local material_sucker_component = EntityGetFirstComponentIncludingDisabled(tooltip_item, "MaterialSuckerComponent")
-				local barrel_size = ComponentGetValue2(material_sucker_component, "barrel_size")
-				local count_per_material_type = ComponentGetValue2(material_inventory_component, "count_per_material_type")
-				local total_amount = 0
-				for material_id, amount in pairs(count_per_material_type) do
-					if amount > 0 then
-						total_amount = total_amount + amount
-						local material_name = CellFactory_GetUIName(material_id-1)
-						material_name = GameTextGetTranslatedOrNot(material_name)
-						table.insert(lines, ("%s (%d)"):format(material_name:gsub("^%l", string.upper), amount))
-					end
-				end
-				local fill_percent = math.ceil((total_amount / barrel_size) * 100)
-				item_name = (GameTextGet(item_name, main_material) .. GameTextGet("$item_potion_fullness", fill_percent)):upper()
-			else
-				item_name = GameTextGetTranslatedOrNot(item_name):upper()
-			end
 			GuiBeginAutoBox(gui)
 			GuiLayoutBeginHorizontal(gui, origin_x + box_width + 20, origin_y + 5, true)
 			GuiLayoutBeginVertical(gui, 0, 0)
-			GuiText(gui, 0, 0, item_name)
-			for i, line in ipairs(description) do
-				GuiText(gui, 0, i == 1 and 7 or 0, line)
-			end
+			local lines = split_string(tooltip_item, "\n")
 			for i, line in ipairs(lines) do
-				GuiText(gui, 0, i == 1 and 7 or -1, line)
+				GuiText(gui, 0, i == 1 and 7 or 0, line)
 			end
 			GuiLayoutEnd(gui)
 			GuiLayoutEnd(gui)
