@@ -1,3 +1,6 @@
+v0.4.2:
+- Fix lag/freezing when save & quitting with lots of wands (with lots of spells on them) or items
+
 v0.4.1:
 - Fix tooltip spell rows rendering
 
