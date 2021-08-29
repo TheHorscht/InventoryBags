@@ -1,16 +1,10 @@
 dofile_once("data/scripts/lib/utilities.lua")
 dofile_once("data/scripts/gun/gun_actions.lua")
 dofile_once("mods/InventoryBags/lib/coroutines.lua")
-local sha1 = dofile_once("mods/InventoryBags/lib/sha1.lua")
 dofile_once("mods/InventoryBags/lib/polytools/polytools_init.lua").init("mods/InventoryBags/lib/polytools")
 local polytools = dofile_once("mods/InventoryBags/lib/polytools/polytools.lua")
 local nxml = dofile_once("mods/InventoryBags/lib/nxml.lua")
 local EZWand = dofile_once("mods/InventoryBags/lib/EZWand.lua")
-
-local print_ = print
-function print(...)
-	print_(("(%d) %s"):format(GameGetFrameNum(), select(1, ...)) , select(2, ...))
-end
 
 local spell_icon_lookup = {}
 for i, action in ipairs(actions) do
@@ -224,7 +218,6 @@ function deserialize_entity(str)
 end
 
 function create_storage_entity(ez, poly)
-	-- print(("create_storage_entity(%s, %s) called"):format(ez, sha1.hex(poly):sub(1,8)))
 	local entity = EntityCreateNew()
 	EntityAddComponent2(entity, "VariableStorageComponent", {
 		name = "serialized_ez",
@@ -238,7 +231,6 @@ function create_storage_entity(ez, poly)
 end
 
 function create_item_storage_entity(image_file, potion_color, tooltip, poly)
-	-- print(("create_storage_entity(%s, %s) called"):format(ez, sha1.hex(poly):sub(1,8)))
 	local entity = EntityCreateNew()
 	EntityAddComponent2(entity, "VariableStorageComponent", {
 		name = "serialized_image_file",
@@ -380,7 +372,6 @@ function get_inventory_and_active_item()
 end
 
 function create_and_pick_up_wand(serialized, slot)
-	print(("create_and_pick_up_wand(%s, %s) called"):format(sha1.hex(serialized):sub(1,8), slot))
 	async(function()
 		local new_wand = deserialize_entity(serialized)
 		-- "Pick up" wand and place it in inventory
@@ -401,23 +392,19 @@ function create_and_pick_up_wand(serialized, slot)
 		local inventory_slots, active_item = get_inventory_and_active_item()
 		local active_item_item_comp = EntityGetFirstComponentIncludingDisabled(active_item, "ItemComponent")
 		local currently_selected_slot = ComponentGetValue2(active_item_item_comp, "inventory_slot")
-		print("active_item: " .. type(active_item) .. " - " .. tostring(active_item))
 		if not active_item then
 			currently_selected_slot = 0
 		elseif not is_wand(active_item) then
+			-- Potions/Items start at 0, so add 4 to get the absolute position of the item in the inventory
 			currently_selected_slot = currently_selected_slot + 4
 		end
-		-- Potions/Items start at 0, so add 4 to get the absolute position of the item in the inventory
 		local change_amount = 0
 		for i=currently_selected_slot, currently_selected_slot+8 do
 			local slot_to_check = i % 8
-			print("Checking slot " .. tostring(slot_to_check))
 			if slot_to_check == new_slot then
-				print("Change amount found: " .. tostring(change_amount))
 				break
 			end
 			if inventory_slots[slot_to_check+1] then
-				print("inventory_slots[slot_to_check] ("..tostring(slot_to_check)..") exists, adding change_amount + 1")
 				change_amount = change_amount + 1
 			end
 		end
@@ -430,7 +417,6 @@ function create_and_pick_up_wand(serialized, slot)
 end
 
 function create_and_pick_up_item(serialized, slot)
-	print(("create_and_pick_up_item(%s, %s) called"):format(sha1.hex(serialized):sub(1,8), slot))
 	async(function()
 		local new_item = deserialize_entity(serialized)
 		-- "Pick up" item and place it in inventory
@@ -443,8 +429,6 @@ function create_and_pick_up_item(serialized, slot)
 		local new_slot = slot and slot or first_free_item_slot
 		GamePickUpInventoryItem(EntityGetWithTag("player_unit")[1], new_item)
 		set_inventory_position(new_item, new_slot)
-		print("slot: " .. type(slot) .. " - " .. tostring(slot))
-		print("NEW SLOOOOOOOT: " .. tostring(new_slot))
 		local inventory = get_inventory()
 		EntityAddChild(inventory, new_item)
 		-- /"Pick up" item and place it in inventory
@@ -453,24 +437,19 @@ function create_and_pick_up_item(serialized, slot)
 		local inventory_slots, active_item = get_inventory_and_active_item()
 		local active_item_item_comp = EntityGetFirstComponentIncludingDisabled(active_item, "ItemComponent")
 		local currently_selected_slot = ComponentGetValue2(active_item_item_comp, "inventory_slot")
-		print("active_item: " .. type(active_item) .. " - " .. tostring(active_item))
 		if not active_item then
 			currently_selected_slot = 0
 		elseif not is_wand(active_item) then
+			-- Potions/Items start at 0, so add 4 to get the absolute position of the item in the inventory
 			currently_selected_slot = currently_selected_slot + 4
 		end
-		-- Potions/Items start at 0, so add 4 to get the absolute position of the item in the inventory
-		-- local inv_count = #get_held_wands() + #get_held_items()
 		local change_amount = 0
 		for i=currently_selected_slot, currently_selected_slot+8 do
 			local slot_to_check = i % 8
-			print("Checking slot " .. tostring(slot_to_check+1))
 			if slot_to_check == new_slot then
-				print("Change amount found: " .. tostring(change_amount))
 				break
 			end
-			if inventory_slots[slot_to_check+1] then -- and inventory_slots[slot_to_check+1] ~= new_item
-				print("inventory_slots[slot_to_check] ("..tostring(slot_to_check+1)..") exists, adding change_amount + 1")
+			if inventory_slots[slot_to_check+1] then
 				change_amount = change_amount + 1
 			end
 		end
@@ -572,19 +551,13 @@ function OnPlayerSpawned(player)
 	if wand_storage == 0 then
 		wand_storage = EntityCreateNew("wand_storage_container")
 		EntityAddChild(player, wand_storage)
+	else
+		-- Check if there are old wands in there, if so, upgrade them to the new version format
 		async(function()
-			wait(5)
-			for i=1, 20 do
-				local wand = EntityLoad("data/entities/items/wand_unshuffle_06.xml", 50 + i, 50)
-				GamePickUpInventoryItem(player, wand)
-				put_wand_in_storage(wand)
-				wait(5)
-			end
-			for i=1, 20 do
-				local item = EntityLoad("data/entities/items/pickup/potion.xml", 50 + i, 50)
-				GamePickUpInventoryItem(player, item)
-				put_item_in_storage(item)
-				wait(5)
+			for i, entity_id in ipairs(EntityGetAllChildren(wand_storage) or {}) do
+				if is_wand(entity_id) then
+					put_wand_in_storage(entity_id)
+				end
 			end
 		end)
 	end
@@ -592,6 +565,15 @@ function OnPlayerSpawned(player)
 	if item_storage == 0 then
 		item_storage = EntityCreateNew("item_storage_container")
 		EntityAddChild(player, item_storage)
+	else
+		-- Check if there are old items in there, if so, upgrade them to the new version format
+		async(function()
+			for i, entity_id in ipairs(EntityGetAllChildren(item_storage) or {}) do
+				if is_item(entity_id) then
+					put_item_in_storage(entity_id)
+				end
+			end
+		end)
 	end
 end
 
@@ -854,29 +836,13 @@ function OnWorldPreUpdate()
 		end
 		-- Render a tooltip of the hovered item if we have any
 		if tooltip_item then
-
-
-			-- GuiText(gui, 0, 0, item_name)
-			-- for i, line in ipairs(description) do
-			-- 	GuiText(gui, 0, i == 1 and 7 or 0, line)
-			-- end
-			-- for i, line in ipairs(lines) do
-			-- 	GuiText(gui, 0, i == 1 and 7 or -1, line)
-			-- end
-
-
-
-
 			GuiBeginAutoBox(gui)
 			GuiLayoutBeginHorizontal(gui, origin_x + box_width + 20, origin_y + 5, true)
 			GuiLayoutBeginVertical(gui, 0, 0)
 			local lines = split_string(tooltip_item, "\n")
 			for i, line in ipairs(lines) do
-				-- GuiText(gui, 0, 0, line)
 				local offset = line == " " and -7 or 0
 				GuiText(gui, 0, offset, line)
-				-- GuiText(gui, 0, i == 2 and -4 or 0, line)
-				-- GuiText(gui, 0, i == 1 and 7 or 0, line)
 			end
 			GuiLayoutEnd(gui)
 			GuiLayoutEnd(gui)
