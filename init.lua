@@ -191,7 +191,7 @@ function string_match_percent(ser1, ser2)
 end
 
 ---Needs to be called from inside an async function. Kills entity and returns the serialized string after 1 frame.
-function serialize_entity(entity, dont_kill)
+function serialize_entity(entity)
 	if not coroutine.running() then
 		error("serialize_entity() must be called from inside an async function", 2)
 	end
@@ -200,7 +200,7 @@ function serialize_entity(entity, dont_kill)
 	local serialized = polytools.save(entity)
 	wait(0)
 	entity = EntityGetInRadius(6666666, 6666666, 5)[1]
-	if not dont_kill then EntityKill(entity) end
+	EntityKill(entity)
 	return serialized
 end
 
@@ -214,6 +214,7 @@ function deserialize_entity(str)
 	-- Wait 1 frame for the polymorph to wear off
 	wait(0)
 	local all_entities = EntityGetInRadius(666666, 666666, 3)
+	-- print("#all_entities " .. tostring(#all_entities))
 	return all_entities[1]
 end
 
@@ -252,15 +253,17 @@ function create_item_storage_entity(image_file, potion_color, tooltip, poly)
 end
 
 function put_wand_in_storage(wand)
+	if not coroutine.running() then
+		error("put_wand_in_storage() must be called from inside an async function", 2)
+	end
 	local player = EntityGetWithTag("player_unit")[1]
 	local wand_storage = EntityGetWithName("wand_storage_container")
 	if player and wand_storage > 0 then
-		async(function()
-			local ez = EZWand(wand):Serialize()
-			local poly = serialize_entity(wand)
-			local new_entry = create_storage_entity(ez, poly)
-			EntityAddChild(wand_storage, new_entry)
-		end)
+		wait(0) -- I don't know why this is needed but it won't work otherwise...
+		local ez = EZWand(wand):Serialize()
+		local poly = serialize_entity(wand)
+		local new_entry = create_storage_entity(ez, poly)
+		EntityAddChild(wand_storage, new_entry)
 	end
 end
 
@@ -316,11 +319,9 @@ function put_item_in_storage(item)
 	local player = EntityGetWithTag("player_unit")[1]
 	if player and item_storage > 0 then
 		local image_file, potion_color, tooltip = tooltipify_item(item)
-		async(function()
-			local poly = serialize_entity(item)
-			local new_entry = create_item_storage_entity(image_file, potion_color ,tooltip, poly)
-			EntityAddChild(item_storage, new_entry)
-		end)
+		local poly = serialize_entity(item)
+		local new_entry = create_item_storage_entity(image_file, potion_color ,tooltip, poly)
+		EntityAddChild(item_storage, new_entry)
 	end
 end
 
@@ -372,93 +373,92 @@ function get_inventory_and_active_item()
 end
 
 function create_and_pick_up_wand(serialized, slot)
-	async(function()
-		local new_wand = deserialize_entity(serialized)
-		-- "Pick up" wand and place it in inventory
-		local item_comp = EntityGetFirstComponentIncludingDisabled(new_wand, "ItemComponent")
-		ComponentSetValue2(item_comp, "is_pickable", true)
-		ComponentSetValue2(item_comp, "play_pick_sound", false)
-		ComponentSetValue2(item_comp, "next_frame_pickable", 0)
-		ComponentSetValue2(item_comp, "npc_next_frame_pickable", 0)
-		local first_free_wand_slot = get_first_free_wand_slot()
-		local new_slot = slot and slot or first_free_wand_slot
-		GamePickUpInventoryItem(EntityGetWithTag("player_unit")[1], new_wand)
-		set_inventory_position(new_wand, new_slot)
-		local inventory = get_inventory()
-		EntityAddChild(inventory, new_wand)
-		-- /"Pick up" wand and place it in inventory
+	if not coroutine.running() then
+		error("create_and_pick_up_wand() must be called from inside an async function", 2)
+	end
+	local new_wand = deserialize_entity(serialized)
+	-- "Pick up" wand and place it in inventory
+	local item_comp = EntityGetFirstComponentIncludingDisabled(new_wand, "ItemComponent")
+	ComponentSetValue2(item_comp, "is_pickable", true)
+	ComponentSetValue2(item_comp, "play_pick_sound", false)
+	ComponentSetValue2(item_comp, "next_frame_pickable", 0)
+	ComponentSetValue2(item_comp, "npc_next_frame_pickable", 0)
+	local first_free_wand_slot = get_first_free_wand_slot()
+	local new_slot = slot and slot or first_free_wand_slot
+	GamePickUpInventoryItem(EntityGetWithTag("player_unit")[1], new_wand)
+	set_inventory_position(new_wand, new_slot)
+	local inventory = get_inventory()
+	EntityAddChild(inventory, new_wand)
+	-- /"Pick up" wand and place it in inventory
 
-		-- Scroll to new wand to select it
-		local inventory_slots, active_item = get_inventory_and_active_item()
-		local active_item_item_comp = EntityGetFirstComponentIncludingDisabled(active_item, "ItemComponent")
-		local currently_selected_slot = ComponentGetValue2(active_item_item_comp, "inventory_slot")
-		if not active_item then
-			currently_selected_slot = 0
-		elseif not is_wand(active_item) then
-			-- Potions/Items start at 0, so add 4 to get the absolute position of the item in the inventory
-			currently_selected_slot = currently_selected_slot + 4
+	-- Scroll to new wand to select it
+	local inventory_slots, active_item = get_inventory_and_active_item()
+	local active_item_item_comp = EntityGetFirstComponentIncludingDisabled(active_item, "ItemComponent")
+	local currently_selected_slot = ComponentGetValue2(active_item_item_comp, "inventory_slot")
+	if not active_item then
+		currently_selected_slot = 0
+	elseif not is_wand(active_item) then
+		-- Potions/Items start at 0, so add 4 to get the absolute position of the item in the inventory
+		currently_selected_slot = currently_selected_slot + 4
+	end
+	local change_amount = 0
+	for i=currently_selected_slot, currently_selected_slot+8 do
+		local slot_to_check = i % 8
+		if slot_to_check == new_slot then
+			break
 		end
-		local change_amount = 0
-		for i=currently_selected_slot, currently_selected_slot+8 do
-			local slot_to_check = i % 8
-			if slot_to_check == new_slot then
-				break
-			end
-			if inventory_slots[slot_to_check+1] then
-				change_amount = change_amount + 1
-			end
-		end
-		if not active_item then
+		if inventory_slots[slot_to_check+1] then
 			change_amount = change_amount + 1
 		end
-		scroll_inventory(change_amount)
-		-- /Scroll to new wand to select it
-	end)
+	end
+	if not active_item then
+		change_amount = change_amount + 1
+	end
+	scroll_inventory(change_amount)
+	-- /Scroll to new wand to select it
 end
 
 function create_and_pick_up_item(serialized, slot)
-	async(function()
-		local new_item = deserialize_entity(serialized)
-		-- "Pick up" item and place it in inventory
-		local item_comp = EntityGetFirstComponentIncludingDisabled(new_item, "ItemComponent")
-		ComponentSetValue2(item_comp, "is_pickable", true)
-		ComponentSetValue2(item_comp, "play_pick_sound", false)
-		ComponentSetValue2(item_comp, "next_frame_pickable", 0)
-		ComponentSetValue2(item_comp, "npc_next_frame_pickable", 0)
-		local first_free_item_slot = get_first_free_item_slot()
-		local new_slot = slot and slot or first_free_item_slot
-		GamePickUpInventoryItem(EntityGetWithTag("player_unit")[1], new_item)
-		set_inventory_position(new_item, new_slot)
-		local inventory = get_inventory()
-		EntityAddChild(inventory, new_item)
-		-- /"Pick up" item and place it in inventory
+	local new_item = deserialize_entity(serialized)
+	-- "Pick up" item and place it in inventory
+	local item_comp = EntityGetFirstComponentIncludingDisabled(new_item, "ItemComponent")
+	ComponentSetValue2(item_comp, "is_pickable", true)
+	ComponentSetValue2(item_comp, "play_pick_sound", false)
+	ComponentSetValue2(item_comp, "next_frame_pickable", 0)
+	ComponentSetValue2(item_comp, "npc_next_frame_pickable", 0)
+	local first_free_item_slot = get_first_free_item_slot()
+	local new_slot = slot and slot or first_free_item_slot
+	GamePickUpInventoryItem(EntityGetWithTag("player_unit")[1], new_item)
+	set_inventory_position(new_item, new_slot)
+	local inventory = get_inventory()
+	EntityAddChild(inventory, new_item)
+	-- /"Pick up" item and place it in inventory
 
-		-- Scroll to new item to select it
-		local inventory_slots, active_item = get_inventory_and_active_item()
-		local active_item_item_comp = EntityGetFirstComponentIncludingDisabled(active_item, "ItemComponent")
-		local currently_selected_slot = ComponentGetValue2(active_item_item_comp, "inventory_slot")
-		if not active_item then
-			currently_selected_slot = 0
-		elseif not is_wand(active_item) then
-			-- Potions/Items start at 0, so add 4 to get the absolute position of the item in the inventory
-			currently_selected_slot = currently_selected_slot + 4
+	-- Scroll to new item to select it
+	local inventory_slots, active_item = get_inventory_and_active_item()
+	local active_item_item_comp = EntityGetFirstComponentIncludingDisabled(active_item, "ItemComponent")
+	local currently_selected_slot = ComponentGetValue2(active_item_item_comp, "inventory_slot")
+	if not active_item then
+		currently_selected_slot = 0
+	elseif not is_wand(active_item) then
+		-- Potions/Items start at 0, so add 4 to get the absolute position of the item in the inventory
+		currently_selected_slot = currently_selected_slot + 4
+	end
+	local change_amount = 0
+	for i=currently_selected_slot, currently_selected_slot+8 do
+		local slot_to_check = i % 8
+		if slot_to_check == new_slot then
+			break
 		end
-		local change_amount = 0
-		for i=currently_selected_slot, currently_selected_slot+8 do
-			local slot_to_check = i % 8
-			if slot_to_check == new_slot then
-				break
-			end
-			if inventory_slots[slot_to_check+1] then
-				change_amount = change_amount + 1
-			end
-		end
-		if not active_item then
+		if inventory_slots[slot_to_check+1] then
 			change_amount = change_amount + 1
 		end
-		scroll_inventory(change_amount)
-		-- /Scroll to new item to select it
-	end)
+	end
+	if not active_item then
+		change_amount = change_amount + 1
+	end
+	scroll_inventory(change_amount)
+	-- /Scroll to new item to select it
 end
 
 function retrieve_or_swap_wand(wand)
@@ -492,7 +492,7 @@ function retrieve_or_swap_item(item)
 		local active_item = get_active_item()
 		local inventory_slot
 		if not has_enough_space_for_item() and active_item then
-			if is_wand(active_item) then
+			if not is_item(active_item) then
 				return
 			else
 				-- Swap
@@ -658,7 +658,9 @@ function OnWorldPreUpdate()
 			if wand then
 				taken_slots[wand.inventory_slot] = true
 				if GuiImageButton(gui, new_id(), origin_x + slot_margin + wand.inventory_slot * slot_width_total, origin_y + slot_margin, "", "data/ui_gfx/inventory/inventory_box.png") then
-					put_wand_in_storage(wand.entity_id)
+					async(function()
+						put_wand_in_storage(wand.entity_id)
+					end)
 				end
 				local _, _, hovered, x, y, width, height = GuiGetPreviousWidgetInfo(gui)
 				local w, h = GuiGetImageDimensions(gui, wand.image_file, 1) -- scale
@@ -684,7 +686,9 @@ function OnWorldPreUpdate()
 				local wand = stored_wands[(iy*4 + ix) + 1]
 				if wand then
 					if GuiImageButton(gui, new_id(), origin_x + slot_margin + ix * slot_width_total, origin_y + spacer + slot_margin + slot_height_total + iy * slot_height_total, "", "data/ui_gfx/inventory/inventory_box.png") then
-						retrieve_or_swap_wand(wand)
+						async(function()
+							retrieve_or_swap_wand(wand)
+						end)
 					end
 					local _, _, hovered, x, y, width, height = GuiGetPreviousWidgetInfo(gui)
 					local w, h = GuiGetImageDimensions(gui, wand.sprite_image_file, 1) -- scale
@@ -710,7 +714,9 @@ function OnWorldPreUpdate()
 			if item then
 				taken_slots[item.inventory_slot] = true
 				if GuiImageButton(gui, new_id(), origin_x + slot_margin + item.inventory_slot * slot_width_total, origin_y + slot_margin, "", "data/ui_gfx/inventory/inventory_box.png") then
-					put_item_in_storage(item.entity_id)
+					async(function()
+						put_item_in_storage(item.entity_id)
+					end)
 				end
 				local _, _, hovered, x, y, width, height = GuiGetPreviousWidgetInfo(gui)
 				local w, h = GuiGetImageDimensions(gui, item.image_file, 1)
@@ -744,7 +750,9 @@ function OnWorldPreUpdate()
 				local item = stored_items[(iy*4 + ix) + 1]
 				if item then
 					if GuiImageButton(gui, new_id(), origin_x + slot_margin + ix * slot_width_total, origin_y + spacer + slot_margin + slot_height_total + iy * slot_height_total, "", "data/ui_gfx/inventory/inventory_box.png") then
-						retrieve_or_swap_item(item)
+						async(function()
+							retrieve_or_swap_item(item)
+						end)
 					end
 					local _, _, hovered, x, y, width, height = GuiGetPreviousWidgetInfo(gui)
 					local w, h = GuiGetImageDimensions(gui, item.image_file, 1)
