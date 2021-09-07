@@ -1,3 +1,6 @@
+v0.4.4:
+- Fix wands/items disappearing some more
+
 v0.4.3:
 - Fix wands/items disappearing or duplicating into other wands/items
 

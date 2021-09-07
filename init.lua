@@ -214,8 +214,7 @@ function deserialize_entity(str)
 	-- Wait 1 frame for the polymorph to wear off
 	wait(0)
 	local all_entities = EntityGetInRadius(666666, 666666, 3)
-	-- print("#all_entities " .. tostring(#all_entities))
-	return all_entities[1]
+	return EntityGetRootEntity(all_entities[1])
 end
 
 function create_storage_entity(ez, poly)
@@ -318,6 +317,7 @@ function put_item_in_storage(item)
 	local num_items_stored = #(EntityGetAllChildren(item_storage) or {})
 	local player = EntityGetWithTag("player_unit")[1]
 	if player and item_storage > 0 then
+		wait(0) -- I don't know why this is needed but it won't work otherwise...
 		local image_file, potion_color, tooltip = tooltipify_item(item)
 		local poly = serialize_entity(item)
 		local new_entry = create_item_storage_entity(image_file, potion_color ,tooltip, poly)
@@ -385,7 +385,7 @@ function create_and_pick_up_wand(serialized, slot)
 	ComponentSetValue2(item_comp, "npc_next_frame_pickable", 0)
 	local first_free_wand_slot = get_first_free_wand_slot()
 	local new_slot = slot and slot or first_free_wand_slot
-	GamePickUpInventoryItem(EntityGetWithTag("player_unit")[1], new_wand)
+	GamePickUpInventoryItem(EntityGetWithTag("player_unit")[1], new_wand, false)
 	set_inventory_position(new_wand, new_slot)
 	local inventory = get_inventory()
 	EntityAddChild(inventory, new_wand)
@@ -428,7 +428,7 @@ function create_and_pick_up_item(serialized, slot)
 	ComponentSetValue2(item_comp, "npc_next_frame_pickable", 0)
 	local first_free_item_slot = get_first_free_item_slot()
 	local new_slot = slot and slot or first_free_item_slot
-	GamePickUpInventoryItem(EntityGetWithTag("player_unit")[1], new_item)
+	GamePickUpInventoryItem(EntityGetWithTag("player_unit")[1], new_item, false)
 	set_inventory_position(new_item, new_slot)
 	local inventory = get_inventory()
 	EntityAddChild(inventory, new_item)
