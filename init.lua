@@ -1,15 +1,9 @@
 dofile_once("data/scripts/lib/utilities.lua")
-dofile_once("data/scripts/gun/gun_actions.lua")
 dofile_once("mods/InventoryBags/lib/coroutines.lua")
 dofile_once("mods/InventoryBags/lib/polytools/polytools_init.lua").init("mods/InventoryBags/lib/polytools")
 local polytools = dofile_once("mods/InventoryBags/lib/polytools/polytools.lua")
 local nxml = dofile_once("mods/InventoryBags/lib/nxml.lua")
-local EZWand = dofile_once("mods/InventoryBags/lib/EZWand.lua")
-
-local spell_icon_lookup = {}
-for i, action in ipairs(actions) do
-	spell_icon_lookup[action.id] = action.sprite
-end
+local EZWand = dofile_once("mods/InventoryBags/lib/EZWand/EZWand.lua")
 
 local function split_string(inputstr, sep)
   sep = sep or "%s"
@@ -21,6 +15,7 @@ local function split_string(inputstr, sep)
 end
 
 local function ends_with(str, ending)
+	if not str then error("str is nil", 2) end
   return ending == "" or str:sub(-#ending) == ending
 end
 
@@ -547,6 +542,13 @@ function get_xml_sprite(sprite_xml_path)
 end
 
 function OnPlayerSpawned(player)
+	if not spell_icon_lookup then
+		spell_icon_lookup = {}
+		dofile_once("data/scripts/gun/gun_actions.lua")
+		for i, action in ipairs(actions) do
+			spell_icon_lookup[action.id] = action.sprite
+		end
+	end
 	local wand_storage = EntityGetWithName("wand_storage_container")
 	if wand_storage == 0 then
 		wand_storage = EntityCreateNew("wand_storage_container")
