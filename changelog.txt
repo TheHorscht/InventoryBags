@@ -1,3 +1,8 @@
+v0.4.6:
+- Add always cast spells to tooltip
+- Add spell type border for spells in tooltip
+- Improve tooltip by making it look almost exactly like the vanilla one
+
 v0.4.5:
 - Improve compatibility with some modded wands/spells
 

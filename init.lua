@@ -1,4 +1,5 @@
 dofile_once("data/scripts/lib/utilities.lua")
+dofile_once("data/scripts/gun/gun_enums.lua")
 dofile_once("mods/InventoryBags/lib/coroutines.lua")
 dofile_once("mods/InventoryBags/lib/polytools/polytools_init.lua").init("mods/InventoryBags/lib/polytools")
 local polytools = dofile_once("mods/InventoryBags/lib/polytools/polytools.lua")
@@ -541,12 +542,30 @@ function get_xml_sprite(sprite_xml_path)
 	return xml.attr.filename
 end
 
+local spell_type_bgs = {
+	[ACTION_TYPE_PROJECTILE] = "data/ui_gfx/inventory/item_bg_projectile.png",
+	[ACTION_TYPE_STATIC_PROJECTILE] = "data/ui_gfx/inventory/item_bg_static_projectile.png",
+	[ACTION_TYPE_MODIFIER] = "data/ui_gfx/inventory/item_bg_modifier.png",
+	[ACTION_TYPE_DRAW_MANY] = "data/ui_gfx/inventory/item_bg_draw_many.png",
+	[ACTION_TYPE_MATERIAL] = "data/ui_gfx/inventory/item_bg_material.png",
+	[ACTION_TYPE_OTHER] = "data/ui_gfx/inventory/item_bg_other.png",
+	[ACTION_TYPE_UTILITY] = "data/ui_gfx/inventory/item_bg_utility.png",
+	[ACTION_TYPE_PASSIVE] = "data/ui_gfx/inventory/item_bg_passive.png",
+}
+
+local function get_spell_bg(action_id)
+	return spell_type_bgs[spell_lookup[action_id] and spell_lookup[action_id].type] or spell_type_bgs[ACTION_TYPE_OTHER]
+end
+
 function OnPlayerSpawned(player)
-	if not spell_icon_lookup then
-		spell_icon_lookup = {}
+	if not spell_lookup then
+		spell_lookup = {}
 		dofile_once("data/scripts/gun/gun_actions.lua")
 		for i, action in ipairs(actions) do
-			spell_icon_lookup[action.id] = action.sprite
+			spell_lookup[action.id] = { 
+				icon = action.sprite,
+				type = action.type
+			}
 		end
 	end
 	local wand_storage = EntityGetWithName("wand_storage_container")
@@ -781,12 +800,11 @@ function OnWorldPreUpdate()
 			local wand = tooltip_wand
 			local margin = -3
 			local wand_name = "WAND"
-			local _, _, _, spread_icon_x, spread_icon_y, spread_icon_width, spread_icon_height -- Saves the position and width of the spread icon so we can draw the spells below it
 			GuiBeginAutoBox(gui)
 			GuiLayoutBeginHorizontal(gui, origin_x + box_width + 20, origin_y + 5, true)
 			GuiLayoutBeginVertical(gui, 0, 0)
 			GuiText(gui, 0, 0, wand_name)
-			GuiImage(gui, new_id(), 0, 7, "data/ui_gfx/inventory/icon_gun_shuffle.png", 1, 1, 1)
+			GuiImage(gui, new_id(), 0, 4, "data/ui_gfx/inventory/icon_gun_shuffle.png", 1, 1, 1)
 			GuiImage(gui, new_id(), 0, 1, "data/ui_gfx/inventory/icon_gun_actions_per_round.png", 1, 1, 1)
 			GuiImage(gui, new_id(), 0, 1, "data/ui_gfx/inventory/icon_fire_rate_wait.png", 1, 1, 1)
 			GuiImage(gui, new_id(), 0, 1, "data/ui_gfx/inventory/icon_gun_reload_time.png", 1, 1, 1)
@@ -794,10 +812,11 @@ function OnWorldPreUpdate()
 			GuiImage(gui, new_id(), 0, 1, "data/ui_gfx/inventory/icon_mana_charge_speed.png", 1, 1, 1)
 			GuiImage(gui, new_id(), 0, 1, "data/ui_gfx/inventory/icon_gun_capacity.png", 1, 1, 1)
 			GuiImage(gui, new_id(), 0, 1, "data/ui_gfx/inventory/icon_spread_degrees.png", 1, 1, 1)
-			_, _, _, spread_icon_x, spread_icon_y, spread_icon_width, spread_icon_height = GuiGetPreviousWidgetInfo(gui)
+			 -- Saves the position and width of the spread icon so we can draw the spells below it
+			local _, _, _, last_icon_x, last_icon_y, last_icon_width, last_icon_height = GuiGetPreviousWidgetInfo(gui)
 			GuiLayoutEnd(gui)
 			local wand_name_width = GuiGetTextDimensions(gui, wand_name)
-			GuiLayoutBeginVertical(gui, 12 - wand_name_width, 0, true)
+			GuiLayoutBeginVertical(gui, 12 - wand_name_width, -3, true)
 			GuiText(gui, 0, 0, " ")
 			GuiText(gui, 0, 5, GameTextGetTranslatedOrNot("$inventory_shuffle"))
 			GuiText(gui, 0, margin, GameTextGetTranslatedOrNot("$inventory_actionspercast"))
@@ -808,7 +827,7 @@ function OnWorldPreUpdate()
 			GuiText(gui, 0, margin, GameTextGetTranslatedOrNot("$inventory_capacity"))
 			GuiText(gui, 0, margin, GameTextGetTranslatedOrNot("$inventory_spread"))
 			GuiLayoutEnd(gui)
-			GuiLayoutBeginVertical(gui, 0, 0, true)
+			GuiLayoutBeginVertical(gui, -6, -3, true)
 			GuiText(gui, 0, 0, " ")
 			GuiText(gui, 0, 5, GameTextGetTranslatedOrNot(wand.props.shuffle and "$menu_yes" or "$menu_no"))
 			GuiText(gui, 0, margin, ("%.0f"):format(wand.props.spellsPerCast))
@@ -820,24 +839,67 @@ function OnWorldPreUpdate()
 			GuiText(gui, 0, margin, ("%.1f DEG"):format(wand.props.spread))
 			GuiLayoutEnd(gui)
 			GuiLayoutEnd(gui)
-			local spells = wand.spells
-			GuiLayoutBeginHorizontal(gui, spread_icon_x, spread_icon_y + spread_icon_height + 7, true)
+			local always_cast_spell_icon_scale = 0.711
+			local add_some = 0 -- I'm out of creativity for variable names...
+			-- Always casts
+			if #wand.always_cast_spells > 0 then
+				add_some = 3
+				local background_scale = 0.768
+				GuiLayoutBeginHorizontal(gui, last_icon_x, last_icon_y + last_icon_height + 8, true)
+				GuiImage(gui, new_id(), 0, 1, "data/ui_gfx/inventory/icon_gun_permanent_actions.png", 1, 1, 1)
+				_, _, _, last_icon_x, last_icon_y, last_icon_width, last_icon_height = GuiGetPreviousWidgetInfo(gui)
+				GuiText(gui, 3, 0, GameTextGetTranslatedOrNot("$inventory_alwayscasts"))
+				local _, _, _, ac_icon_x, ac_icon_y, ac_icon_width, ac_icon_height = GuiGetPreviousWidgetInfo(gui)
+				local last_ac_x, last_ac_y, last_ac_width, last_ac_height
+				for i, spell in ipairs(wand.always_cast_spells) do
+					local item_bg_icon = get_spell_bg(spell)
+					local w, h = GuiGetImageDimensions(gui, item_bg_icon, background_scale)
+					local x, y 
+					if i == 1 then
+						x, y = ac_icon_x + ac_icon_width + 3, ac_icon_y - ac_icon_height / 2 + 2.5
+					else
+						x, y = math.floor(last_ac_x + (last_ac_width - 2)) + 1, last_ac_y
+					end
+					GuiZSetForNextWidget(gui, 9)
+					GuiOptionsAddForNextWidget(gui, GUI_OPTION.Layout_NoLayouting)
+					-- Background / Spell type border
+					GuiImage(gui, new_id(), x, y, item_bg_icon, 1, background_scale, background_scale)
+					_, _, _, last_ac_x, last_ac_y, last_ac_width, last_ac_height = GuiGetPreviousWidgetInfo(gui)
+					local _, _, _, x, y, w, h = GuiGetPreviousWidgetInfo(gui)
+					GuiOptionsAddForNextWidget(gui, GUI_OPTION.Layout_NoLayouting)
+					-- Spell icon
+					GuiImage(gui, new_id(), x + 2, y + 2, (spell_lookup[spell] and spell_lookup[spell].icon) or "data/ui_gfx/gun_actions/unidentified.png", 1, always_cast_spell_icon_scale, always_cast_spell_icon_scale)
+				end
+				GuiLayoutEnd(gui)
+			end
+			-- /Always casts
+			-- Spells
+			local spell_icon_scale = 0.711
+			local background_scale = 0.768
+			GuiLayoutBeginHorizontal(gui, last_icon_x, last_icon_y + last_icon_height + 7 + add_some, true)
 			local row = 0
-			local spell_icon_scale = 0.75
 			for i=1, wand.props.capacity do
 				GuiZSetForNextWidget(gui, 9)
-				GuiImage(gui, new_id(), -0.5, -0.5, "data/ui_gfx/inventory/inventory_box.png", 1, spell_icon_scale, spell_icon_scale)
-				if spells[i] then
+				GuiImage(gui, new_id(), -0.3, -0.5, "data/ui_gfx/inventory/inventory_box.png", 1, background_scale, background_scale)
+				if wand.spells[i] then
 					local _, _, _, x, y = GuiGetPreviousWidgetInfo(gui)
+					x = x + 0.3
+					y = y + 0.5
+					local item_bg_icon = get_spell_bg(wand.spells[i])
+					GuiZSetForNextWidget(gui, 8.5)
+					GuiOptionsAddForNextWidget(gui, GUI_OPTION.Layout_NoLayouting)
+					-- Background / Spell type border
+					GuiImage(gui, new_id(), x - 2, y - 2, item_bg_icon, 0.8, background_scale + 0.01, background_scale + 0.01)
 					GuiZSetForNextWidget(gui, 8)
 					GuiOptionsAddForNextWidget(gui, GUI_OPTION.Layout_NoLayouting)
-					GuiImage(gui, new_id(), x, y, spell_icon_lookup[spells[i]] or "data/ui_gfx/gun_actions/unidentified.png", 1, spell_icon_scale, spell_icon_scale)
+					GuiImage(gui, new_id(), x, y, (spell_lookup[wand.spells[i]] and spell_lookup[wand.spells[i]].icon) or "data/ui_gfx/gun_actions/unidentified.png", 1, spell_icon_scale, spell_icon_scale)
 				end
 				-- Start a new row after 10 spells
 				if i % 10 == 0 then
 					row = row + 1
 					GuiLayoutEnd(gui)
-					GuiLayoutBeginHorizontal(gui, spread_icon_x, spread_icon_y + spread_icon_height + 7 + row * 18 * spell_icon_scale, true)
+					_, _, _, _, last_icon_y, last_icon_width, last_icon_height = GuiGetPreviousWidgetInfo(gui)
+					GuiLayoutBeginHorizontal(gui, last_icon_x, last_icon_y + 19.7 * spell_icon_scale, true)
 				end
 			end
 			GuiLayoutEnd(gui)
