@@ -1,3 +1,6 @@
+v0.4.8:
+- Fix small tooltip rendering bug with wands with many AC spells.
+
 v0.4.7:
 - Improve tooltip even more and also render the wand in the tooltip
 
