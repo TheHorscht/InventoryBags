@@ -1,3 +1,6 @@
+-- TODO: Add something like filters
+-- For instance 4 buttons at the top, labeled [1][2][3][4] and you can set tooltip names for it in the mod settings
+
 dofile_once("data/scripts/lib/utilities.lua")
 dofile_once("data/scripts/gun/gun_enums.lua")
 dofile_once("mods/InventoryBags/lib/coroutines.lua")
@@ -47,7 +50,7 @@ end
 function is_item(entity)
 	local ability_component = EntityGetFirstComponentIncludingDisabled(entity, "AbilityComponent")
 	local ending_mc_guffin_component = EntityGetFirstComponentIncludingDisabled(entity, "EndingMcGuffinComponent")
-	return ending_mc_guffin_component or ComponentGetValue2(ability_component, "use_gun_script") == false
+	return (not ability_component) or ending_mc_guffin_component or ComponentGetValue2(ability_component, "use_gun_script") == false
 end
 
 function get_inventory()
@@ -624,6 +627,9 @@ function OnPausedChanged(is_paused, is_inventory_pause)
 	button_locked = ModSettingGet("InventoryBags.locked")
 end
 
+local active_wand_tab = 1
+local active_item_tab = 1
+
 function OnWorldPreUpdate()
 	-- This is for making async functions work
 	wake_up_waiting_threads(1)
@@ -672,6 +678,28 @@ function OnWorldPreUpdate()
 		local origin_x, origin_y = 23, 48
 		GuiZSetForNextWidget(gui, 20)
 		GuiImageNinePiece(gui, new_id(), origin_x, origin_y, box_width, box_height_wands, 1, "mods/InventoryBags/files/container_9piece.png", "mods/InventoryBags/files/container_9piece.png")
+		-- Render tabs
+		for i=1, 5 do
+			local add_text_offset = 0
+			if i == 1 then
+				add_text_offset = 1
+			end
+			-- Left side (Wand tabs)
+			GuiZSetForNextWidget(gui, 21)
+			local is_active_wand_tab = active_wand_tab == i
+			if GuiImageButton(gui, new_id(), origin_x - 16, origin_y + 5 + (i-1) * 17, "", "mods/InventoryBags/files/tab_left_empty" .. (is_active_wand_tab and "_active" or "") .. ".png") then
+				active_wand_tab = i
+			end
+			GuiColorSetForNextWidget(gui, 1, 1, 1, 0.8)
+			GuiText(gui, origin_x - 10 + add_text_offset, origin_y + 8 + (i-1) * 17, i)
+			-- Right side (Item tabs)
+			GuiZSetForNextWidget(gui, 21)
+			local is_active_item_tab = active_item_tab == i
+			if GuiImageButton(gui, new_id(), origin_x + 157, origin_y + 5 + (i-1) * 17, "", "mods/InventoryBags/files/tab_right_empty" .. (is_active_item_tab and "_active" or "") .. ".png") then
+				active_item_tab = i
+			end
+			GuiText(gui, origin_x + 159 + add_text_offset, origin_y + 8 + (i-1) * 17, i)
+		end
 		local tooltip_wand
 		local taken_slots = {}
 		-- Render the held wands and save the taken positions so we can render the empty slots after this
