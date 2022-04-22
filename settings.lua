@@ -40,7 +40,8 @@ mod_settings =
 	{
 		category_id = "tab_labels",
 		ui_name = "Tab Labels",
-		ui_description = "Labels for the tabs when hovering over them.",
+		ui_description = "Labels for the tabs when hovering over them.\nKeep the mouse hovered over these text fields to enter text.",
+		foldable = true,
 		settings = {
 			{
 				id = "tab_label_wands_1",
