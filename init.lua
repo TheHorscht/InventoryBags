@@ -667,8 +667,8 @@ local tab_labels = {
 
 function load_label_settings()
 	for i=1, num_tabs do
-		tab_labels.wands[i] = ModSettingGet("InventoryBags.tab_label_wands_" .. i)
-		tab_labels.items[i] = ModSettingGet("InventoryBags.tab_label_items_" .. i)
+		tab_labels.wands[i] = ModSettingGet("InventoryBags.tab_label_wands_" .. i) or ""
+		tab_labels.items[i] = ModSettingGet("InventoryBags.tab_label_items_" .. i) or ""
 	end
 end
 
@@ -739,7 +739,7 @@ function OnWorldPreUpdate()
 		GuiZSetForNextWidget(gui, 20)
 		GuiImageNinePiece(gui, new_id(), origin_x, origin_y, box_width, box_height_wands, 1, "mods/InventoryBags/files/container_9piece.png", "mods/InventoryBags/files/container_9piece.png")
 		-- Render tabs
-		for i=1, 5 do
+		for i=1, num_tabs do
 			local add_text_offset = 0
 			if i == 1 then
 				add_text_offset = 1
