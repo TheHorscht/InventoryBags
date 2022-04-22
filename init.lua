@@ -10,6 +10,7 @@ local nxml = dofile_once("mods/InventoryBags/lib/nxml.lua")
 local EZWand = dofile_once("mods/InventoryBags/lib/EZWand/EZWand.lua")
 
 local num_tabs = 5
+local storage_version = 1
 
 local function split_string(inputstr, sep)
   sep = sep or "%s"
@@ -598,56 +599,51 @@ function OnPlayerSpawned(player)
 			}
 		end
 	end
+	local function create_and_add_tab_storage_entities(parent_container_id, num_tabs)
+		local first_tab_storage_entity
+		for i=1, num_tabs do
+			local tab_entity = EntityCreateNew("tab_" .. i)
+			if i == 1 then
+				first_tab_storage_entity = tab_entity
+			end
+			EntityAddChild(parent_container_id, tab_entity)
+		end
+		return first_tab_storage_entity
+	end
 	local wand_storage = EntityGetWithName("wand_storage_container")
 	if wand_storage == 0 then
 		wand_storage = EntityCreateNew("wand_storage_container")
-		-- TODO: Convert old format
-		for i=1, num_tabs do
-			EntityAddChild(wand_storage, EntityCreateNew("tab_" .. i))
-		end
+		create_and_add_tab_storage_entities(wand_storage, num_tabs)
 		EntityAddChild(player, wand_storage)
+		GlobalsSetValue("InventoryBags_active_storage_version", storage_version)
 	else
-		-- Check if there are old wands in there, if so, upgrade them to the new version format
-		async(function()
-			for i, entity_id in ipairs(EntityGetAllChildren(wand_storage) or {}) do
-				if is_wand(entity_id) then
-					put_wand_in_storage(entity_id)
-				end
+		if tonumber(GlobalsGetValue("InventoryBags_active_storage_version", "0")) ~= storage_version then
+			local old_wands = EntityGetAllChildren(wand_storage)
+			local first_tab_storage_entity = create_and_add_tab_storage_entities(wand_storage, num_tabs)
+			-- Child entities are serialized wands
+			for i, entity_id in ipairs(old_wands or {}) do
+				EntityRemoveFromParent(entity_id)
+				EntityAddChild(first_tab_storage_entity, entity_id)
 			end
-		end)
+		end
 	end
 	local item_storage = EntityGetWithName("item_storage_container")
 	if item_storage == 0 then
 		item_storage = EntityCreateNew("item_storage_container")
-		-- TODO: Convert old format
-		for i=1, num_tabs do
-			EntityAddChild(item_storage, EntityCreateNew("tab_" .. i))
-		end
+		create_and_add_tab_storage_entities(item_storage, num_tabs)
 		EntityAddChild(player, item_storage)
 	else
-		-- Check if there are old items in there, if so, upgrade them to the new version format
-		async(function()
-			for i, entity_id in ipairs(EntityGetAllChildren(item_storage) or {}) do
-				if is_item(entity_id) then
-					put_item_in_storage(entity_id)
-				end
+		if tonumber(GlobalsGetValue("InventoryBags_active_storage_version", "0")) ~= storage_version then
+			GlobalsSetValue("InventoryBags_active_storage_version", storage_version)
+			local old_items = EntityGetAllChildren(item_storage)
+			local first_tab_storage_entity = create_and_add_tab_storage_entities(item_storage, num_tabs)
+			-- Child entities are serialized items
+			for i, entity_id in ipairs(old_items or {}) do
+				EntityRemoveFromParent(entity_id)
+				EntityAddChild(first_tab_storage_entity, entity_id)
 			end
-		end)
+		end
 	end
-	-- async(function()
-	-- 	for j=1, 5 do
-	-- 		for i=1, 20 do
-	-- 			local wand_id = EntityLoad("data/entities/items/wand_unshuffle_06.xml", j, i)
-	-- 			EntitySetComponentsWithTagEnabled(wand_id, "enabled_in_world", false)
-	-- 			put_wand_in_storage(wand_id, j)
-	-- 			wait(0)
-	-- 			local item_id = EntityLoad("data/entities/items/pickup/potion_water.xml", j, i)
-	-- 			EntitySetComponentsWithTagEnabled(item_id, "enabled_in_world", false)
-	-- 			put_item_in_storage(item_id, j)
-	-- 			wait(0)
-	-- 		end
-	-- 	end
-	-- end)
 end
 
 function is_inventory_open()
