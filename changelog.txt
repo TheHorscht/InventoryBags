@@ -1,3 +1,8 @@
+UNRELEASED:
+- Add tabs to allow better organizing of wands and items (with customizable labels, check mod settings).
+- The GUI will now expand as soon as it is "full", to better indicate that it expands automatically and you can keep adding stuff forever.
+- Wand and items of an active old run should hopefully be converted to the new system.
+
 v0.4.8:
 - Fix small tooltip rendering bug with wands with many AC spells.
 
