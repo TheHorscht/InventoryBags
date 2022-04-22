@@ -9,6 +9,8 @@ local polytools = dofile_once("mods/InventoryBags/lib/polytools/polytools.lua")
 local nxml = dofile_once("mods/InventoryBags/lib/nxml.lua")
 local EZWand = dofile_once("mods/InventoryBags/lib/EZWand/EZWand.lua")
 
+local num_tabs = 5
+
 local function split_string(inputstr, sep)
   sep = sep or "%s"
   local t= {}
@@ -116,10 +118,12 @@ function get_held_items()
 	end
 end
 
-function get_stored_wands()
+function get_stored_wands(tab_number)
+	tab_number = tab_number or 1
 	local wand_storage = EntityGetWithName("wand_storage_container")
 	if wand_storage > 0 then
-		local serialized_wands = EntityGetAllChildren(wand_storage) or {}
+		local tab_entity = get_tab_entity(wand_storage, tab_number)
+		local serialized_wands = EntityGetAllChildren(tab_entity) or {}
 		for i, container_entity_id in ipairs(serialized_wands) do
 			local serialized_ez, serialized_poly
 			for i, comp in ipairs(EntityGetComponentIncludingDisabled(container_entity_id, "VariableStorageComponent")) do
@@ -144,10 +148,12 @@ function get_stored_wands()
 	end
 end
 
-function get_stored_items()
+function get_stored_items(tab_number)
+	tab_number = tab_number or 1
 	local item_storage = EntityGetWithName("item_storage_container")
 	if item_storage > 0 then
-		local serialized_items = EntityGetAllChildren(item_storage) or {}
+		local tab_entity = get_tab_entity(item_storage, tab_number)
+		local serialized_items = EntityGetAllChildren(tab_entity) or {}
 		for i, container_entity_id in ipairs(serialized_items) do
 			local image_file, potion_color, tooltip, serialized_poly
 			for i, comp in ipairs(EntityGetComponentIncludingDisabled(container_entity_id, "VariableStorageComponent")) do
@@ -216,6 +222,14 @@ function deserialize_entity(str)
 	return EntityGetRootEntity(all_entities[1])
 end
 
+function get_tab_entity(storage_entity, tab_number)
+	for i, child in ipairs(EntityGetAllChildren(storage_entity) or {}) do
+		if EntityGetName(child) == "tab_" .. tab_number then
+			return child
+		end
+	end
+end
+
 function create_storage_entity(ez, poly)
 	local entity = EntityCreateNew()
 	EntityAddComponent2(entity, "VariableStorageComponent", {
@@ -250,10 +264,11 @@ function create_item_storage_entity(image_file, potion_color, tooltip, poly)
 	return entity
 end
 
-function put_wand_in_storage(wand)
+function put_wand_in_storage(wand, tab_number)
 	if not coroutine.running() then
 		error("put_wand_in_storage() must be called from inside an async function", 2)
 	end
+	tab_number = tab_number or 1
 	local player = EntityGetWithTag("player_unit")[1]
 	local wand_storage = EntityGetWithName("wand_storage_container")
 	if player and wand_storage > 0 then
@@ -261,7 +276,8 @@ function put_wand_in_storage(wand)
 		local ez = EZWand(wand):Serialize()
 		local poly = serialize_entity(wand)
 		local new_entry = create_storage_entity(ez, poly)
-		EntityAddChild(wand_storage, new_entry)
+		local tab_entity = get_tab_entity(wand_storage, tab_number)
+		EntityAddChild(tab_entity, new_entry)
 	end
 end
 
@@ -311,7 +327,11 @@ function tooltipify_item(item)
 	return image_file, potion_color, tooltip
 end
 
-function put_item_in_storage(item)
+function put_item_in_storage(item, tab_number)
+	if not coroutine.running() then
+		error("put_item_in_storage() must be called from inside an async function", 2)
+	end
+	tab_number = tab_number or 1
 	local item_storage = EntityGetWithName("item_storage_container")
 	local num_items_stored = #(EntityGetAllChildren(item_storage) or {})
 	local player = EntityGetWithTag("player_unit")[1]
@@ -320,7 +340,8 @@ function put_item_in_storage(item)
 		local image_file, potion_color, tooltip = tooltipify_item(item)
 		local poly = serialize_entity(item)
 		local new_entry = create_item_storage_entity(image_file, potion_color ,tooltip, poly)
-		EntityAddChild(item_storage, new_entry)
+		local tab_entity = get_tab_entity(item_storage, tab_number)
+		EntityAddChild(tab_entity, new_entry)
 	end
 end
 
@@ -460,7 +481,10 @@ function create_and_pick_up_item(serialized, slot)
 	-- /Scroll to new item to select it
 end
 
-function retrieve_or_swap_wand(wand)
+function retrieve_or_swap_wand(wand, tab_number)
+	if not tab_number then
+		error("Tab number expected", 2)
+	end
 	local inventory = get_inventory()
 	if inventory > 0 then
 		local active_item = get_active_item()
@@ -472,7 +496,7 @@ function retrieve_or_swap_wand(wand)
 			else
 				-- Swap
 				inventory_slot = get_inventory_position(active_item)
-				put_wand_in_storage(active_item)
+				put_wand_in_storage(active_item, tab_number)
 			end
 		end
 		local first_free_wand_slot = get_first_free_wand_slot()
@@ -484,7 +508,10 @@ function retrieve_or_swap_wand(wand)
 	end
 end
 
-function retrieve_or_swap_item(item)
+function retrieve_or_swap_item(item, tab_number)
+	if not tab_number then
+		error("Tab number expected", 2)
+	end
 	local inventory = get_inventory()
 	local item_storage = EntityGetWithName("item_storage_container")
 	if inventory > 0 and item_storage > 0 then
@@ -496,7 +523,7 @@ function retrieve_or_swap_item(item)
 			else
 				-- Swap
 				inventory_slot = get_inventory_position(active_item)
-				put_item_in_storage(active_item)
+				put_item_in_storage(active_item, tab_number)
 			end
 		end
 		local first_free_item_slot = get_first_free_item_slot()
@@ -574,6 +601,10 @@ function OnPlayerSpawned(player)
 	local wand_storage = EntityGetWithName("wand_storage_container")
 	if wand_storage == 0 then
 		wand_storage = EntityCreateNew("wand_storage_container")
+		-- TODO: Convert old format
+		for i=1, num_tabs do
+			EntityAddChild(wand_storage, EntityCreateNew("tab_" .. i))
+		end
 		EntityAddChild(player, wand_storage)
 	else
 		-- Check if there are old wands in there, if so, upgrade them to the new version format
@@ -588,6 +619,10 @@ function OnPlayerSpawned(player)
 	local item_storage = EntityGetWithName("item_storage_container")
 	if item_storage == 0 then
 		item_storage = EntityCreateNew("item_storage_container")
+		-- TODO: Convert old format
+		for i=1, num_tabs do
+			EntityAddChild(item_storage, EntityCreateNew("tab_" .. i))
+		end
 		EntityAddChild(player, item_storage)
 	else
 		-- Check if there are old items in there, if so, upgrade them to the new version format
@@ -599,6 +634,20 @@ function OnPlayerSpawned(player)
 			end
 		end)
 	end
+	-- async(function()
+	-- 	for j=1, 5 do
+	-- 		for i=1, 20 do
+	-- 			local wand_id = EntityLoad("data/entities/items/wand_unshuffle_06.xml", j, i)
+	-- 			EntitySetComponentsWithTagEnabled(wand_id, "enabled_in_world", false)
+	-- 			put_wand_in_storage(wand_id, j)
+	-- 			wait(0)
+	-- 			local item_id = EntityLoad("data/entities/items/pickup/potion_water.xml", j, i)
+	-- 			EntitySetComponentsWithTagEnabled(item_id, "enabled_in_world", false)
+	-- 			put_item_in_storage(item_id, j)
+	-- 			wait(0)
+	-- 		end
+	-- 	end
+	-- end)
 end
 
 function is_inventory_open()
@@ -615,6 +664,20 @@ button_pos_x = ModSettingGet("InventoryBags.pos_x")
 button_pos_y = ModSettingGet("InventoryBags.pos_y")
 button_locked = ModSettingGet("InventoryBags.locked")
 
+local tab_labels = {
+	wands = {},
+	items = {},
+}
+
+function load_label_settings()
+	for i=1, num_tabs do
+		tab_labels.wands[i] = ModSettingGet("InventoryBags.tab_label_wands_" .. i)
+		tab_labels.items[i] = ModSettingGet("InventoryBags.tab_label_items_" .. i)
+	end
+end
+
+load_label_settings()
+
 -- OnModSettingsChanged() seems to not work
 function OnPausedChanged(is_paused, is_inventory_pause)
 	if not button_locked and is_paused then
@@ -625,6 +688,7 @@ function OnPausedChanged(is_paused, is_inventory_pause)
 		button_pos_y = ModSettingGet("InventoryBags.pos_y")
 	end
 	button_locked = ModSettingGet("InventoryBags.locked")
+	load_label_settings()
 end
 
 local active_wand_tab = 1
@@ -666,11 +730,11 @@ function OnWorldPreUpdate()
 		local slot_width_total, slot_height_total = (slot_width + slot_margin * 2), (slot_height + slot_margin * 2)
 		local spacer = 4
 		local held_wands = get_held_wands()
-		local stored_wands = get_stored_wands()
+		local stored_wands = get_stored_wands(active_wand_tab)
 		local held_items = get_held_items()
-		local stored_items = get_stored_items()
-		local rows_wands = math.max(4, math.ceil(#stored_wands / 4))
-		local rows_items = math.max(4, math.ceil(#stored_items / 4))
+		local stored_items = get_stored_items(active_item_tab)
+		local rows_wands = math.max(4, math.ceil((#stored_wands + 1) / 4))
+		local rows_items = math.max(4, math.ceil((#stored_items + 1) / 4))
 		local box_width = slot_width_total * 4
 		local box_height_wands = slot_height_total * (rows_wands+1) + spacer
 		local box_height_items = slot_height_total * (rows_items+1) + spacer
@@ -686,18 +750,25 @@ function OnWorldPreUpdate()
 			end
 			-- Left side (Wand tabs)
 			GuiZSetForNextWidget(gui, 21)
-			local is_active_wand_tab = active_wand_tab == i
-			if GuiImageButton(gui, new_id(), origin_x - 16, origin_y + 5 + (i-1) * 17, "", "mods/InventoryBags/files/tab_left_empty" .. (is_active_wand_tab and "_active" or "") .. ".png") then
+			local is_active_wand_tab = function() return active_wand_tab == i end
+			if GuiImageButton(gui, new_id(), origin_x - 16, origin_y + 5 + (i-1) * 17, "", "mods/InventoryBags/files/tab_left_empty" .. (is_active_wand_tab() and "_active" or "") .. ".png") then
 				active_wand_tab = i
 			end
-			GuiColorSetForNextWidget(gui, 1, 1, 1, 0.8)
+			if tab_labels.wands[i] ~= "" then
+				GuiTooltip(gui, tab_labels.wands[i], "")
+			end
+			GuiColorSetForNextWidget(gui, 1, 1, 1, is_active_wand_tab() and 0.8 or 0.5)
 			GuiText(gui, origin_x - 10 + add_text_offset, origin_y + 8 + (i-1) * 17, i)
 			-- Right side (Item tabs)
 			GuiZSetForNextWidget(gui, 21)
-			local is_active_item_tab = active_item_tab == i
-			if GuiImageButton(gui, new_id(), origin_x + 157, origin_y + 5 + (i-1) * 17, "", "mods/InventoryBags/files/tab_right_empty" .. (is_active_item_tab and "_active" or "") .. ".png") then
+			local is_active_item_tab = function() return active_item_tab == i end
+			if GuiImageButton(gui, new_id(), origin_x + 157, origin_y + 5 + (i-1) * 17, "", "mods/InventoryBags/files/tab_right_empty" .. (is_active_item_tab() and "_active" or "") .. ".png") then
 				active_item_tab = i
 			end
+			if tab_labels.items[i] ~= "" then
+				GuiTooltip(gui, tab_labels.items[i], "")
+			end
+			GuiColorSetForNextWidget(gui, 1, 1, 1, is_active_item_tab() and 0.8 or 0.5)
 			GuiText(gui, origin_x + 159 + add_text_offset, origin_y + 8 + (i-1) * 17, i)
 		end
 		local tooltip_wand
@@ -708,7 +779,7 @@ function OnWorldPreUpdate()
 				taken_slots[wand.inventory_slot] = true
 				if GuiImageButton(gui, new_id(), origin_x + slot_margin + wand.inventory_slot * slot_width_total, origin_y + slot_margin, "", "data/ui_gfx/inventory/inventory_box.png") then
 					async(function()
-						put_wand_in_storage(wand.entity_id)
+						put_wand_in_storage(wand.entity_id, active_wand_tab)
 					end)
 				end
 				local _, _, hovered, x, y, width, height = GuiGetPreviousWidgetInfo(gui)
@@ -736,7 +807,7 @@ function OnWorldPreUpdate()
 				if wand then
 					if GuiImageButton(gui, new_id(), origin_x + slot_margin + ix * slot_width_total, origin_y + spacer + slot_margin + slot_height_total + iy * slot_height_total, "", "data/ui_gfx/inventory/inventory_box.png") then
 						async(function()
-							retrieve_or_swap_wand(wand)
+							retrieve_or_swap_wand(wand, active_wand_tab)
 						end)
 					end
 					local _, _, hovered, x, y, width, height = GuiGetPreviousWidgetInfo(gui)
@@ -764,7 +835,7 @@ function OnWorldPreUpdate()
 				taken_slots[item.inventory_slot] = true
 				if GuiImageButton(gui, new_id(), origin_x + slot_margin + item.inventory_slot * slot_width_total, origin_y + slot_margin, "", "data/ui_gfx/inventory/inventory_box.png") then
 					async(function()
-						put_item_in_storage(item.entity_id)
+						put_item_in_storage(item.entity_id, active_item_tab)
 					end)
 				end
 				local _, _, hovered, x, y, width, height = GuiGetPreviousWidgetInfo(gui)
@@ -800,7 +871,7 @@ function OnWorldPreUpdate()
 				if item then
 					if GuiImageButton(gui, new_id(), origin_x + slot_margin + ix * slot_width_total, origin_y + spacer + slot_margin + slot_height_total + iy * slot_height_total, "", "data/ui_gfx/inventory/inventory_box.png") then
 						async(function()
-							retrieve_or_swap_item(item)
+							retrieve_or_swap_item(item, active_item_tab)
 						end)
 					end
 					local _, _, hovered, x, y, width, height = GuiGetPreviousWidgetInfo(gui)
@@ -825,12 +896,12 @@ function OnWorldPreUpdate()
 		end
 		-- Render a tooltip of the hovered wand if we have any
 		if tooltip_wand then
-			EZWand.RenderTooltip(origin_x + box_width + 20, origin_y + 5, tooltip_wand, gui)
+			EZWand.RenderTooltip(origin_x + box_width + 30, origin_y + 5, tooltip_wand, gui)
 		end
 		-- Render a tooltip of the hovered item if we have any
 		if tooltip_item then
 			GuiBeginAutoBox(gui)
-			GuiLayoutBeginHorizontal(gui, origin_x + box_width + 20, origin_y + 5, true)
+			GuiLayoutBeginHorizontal(gui, origin_x + box_width + 30, origin_y + 5, true)
 			GuiLayoutBeginVertical(gui, 0, 0)
 			local lines = split_string(tooltip_item, "\n")
 			for i, line in ipairs(lines) do

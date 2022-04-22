@@ -37,6 +37,83 @@ mod_settings =
 		value_default = true,
 		scope = MOD_SETTING_SCOPE_RUNTIME,
 	},
+	{
+		category_id = "tab_labels",
+		ui_name = "Tab Labels",
+		ui_description = "Labels for the tabs when hovering over them.",
+		settings = {
+			{
+				id = "tab_label_wands_1",
+				ui_name = "Wand bag 1",
+				ui_description = "",
+				value_default = "",
+				scope = MOD_SETTING_SCOPE_RUNTIME,
+			},
+			{
+				id = "tab_label_wands_2",
+				ui_name = "Wand bag 2",
+				ui_description = "",
+				value_default = "",
+				scope = MOD_SETTING_SCOPE_RUNTIME,
+			},
+			{
+				id = "tab_label_wands_3",
+				ui_name = "Wand bag 3",
+				ui_description = "",
+				value_default = "",
+				scope = MOD_SETTING_SCOPE_RUNTIME,
+			},
+			{
+				id = "tab_label_wands_4",
+				ui_name = "Wand bag 4",
+				ui_description = "",
+				value_default = "",
+				scope = MOD_SETTING_SCOPE_RUNTIME,
+			},
+			{
+				id = "tab_label_wands_5",
+				ui_name = "Wand bag 5",
+				ui_description = "",
+				value_default = "",
+				scope = MOD_SETTING_SCOPE_RUNTIME,
+			},
+			{
+				id = "tab_label_items_1",
+				ui_name = "Item bag 1",
+				ui_description = "",
+				value_default = "",
+				scope = MOD_SETTING_SCOPE_RUNTIME,
+			},
+			{
+				id = "tab_label_items_2",
+				ui_name = "Item bag 2",
+				ui_description = "",
+				value_default = "",
+				scope = MOD_SETTING_SCOPE_RUNTIME,
+			},
+			{
+				id = "tab_label_items_3",
+				ui_name = "Item bag 3",
+				ui_description = "",
+				value_default = "",
+				scope = MOD_SETTING_SCOPE_RUNTIME,
+			},
+			{
+				id = "tab_label_items_4",
+				ui_name = "Item bag 4",
+				ui_description = "",
+				value_default = "",
+				scope = MOD_SETTING_SCOPE_RUNTIME,
+			},
+			{
+				id = "tab_label_items_5",
+				ui_name = "Item bag 5",
+				ui_description = "",
+				value_default = "",
+				scope = MOD_SETTING_SCOPE_RUNTIME,
+			},
+		}
+	}
 }
 
 function adjust_setting_values(screen_width, screen_height)
