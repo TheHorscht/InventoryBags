@@ -768,6 +768,11 @@ function OnWorldPreUpdate()
 		local origin_x, origin_y = 23, 48
 		GuiZSetForNextWidget(gui, 20)
 		GuiImageNinePiece(gui, new_id(), origin_x, origin_y, box_width, box_height_wands, 1, "mods/InventoryBags/files/container_9piece.png", "mods/InventoryBags/files/container_9piece.png")
+		-- Render an invisible image over the whole bag to prevent clicks firing wands
+		for offset_y=0, box_height_wands+8, 10 do
+			GuiZSetForNextWidget(gui, -99999)
+			GuiImage(gui, new_id(), origin_x - 4, origin_y - 4 + offset_y, "mods/InventoryBags/files/invisible_80x10.png", 1, 1, 1)
+		end
 		-- Render tabs
 		for i=1, num_tabs do
 			local add_text_offset = 0
@@ -855,6 +860,11 @@ function OnWorldPreUpdate()
 		origin_x = origin_x + box_width + 9
 		GuiZSetForNextWidget(gui, 20)
 		GuiImageNinePiece(gui, new_id(), origin_x, origin_y, box_width, box_height_items, 1, "mods/InventoryBags/files/container_9piece.png", "mods/InventoryBags/files/container_9piece.png")
+		-- Render an invisible image over the whole bag to prevent clicks firing wands
+		for offset_y=0, box_height_items+8, 10 do
+			GuiZSetForNextWidget(gui, -99999)
+			GuiImage(gui, new_id(), origin_x - 4, origin_y - 4 + offset_y, "mods/InventoryBags/files/invisible_80x10.png", 1, 1, 1)
+		end
 		local tooltip_item
 		local taken_slots = {}
 		-- Render the held items and save the taken positions so we can render the empty slots after this
