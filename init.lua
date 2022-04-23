@@ -11,6 +11,8 @@ local EZWand = dofile_once("mods/InventoryBags/lib/EZWand/EZWand.lua")
 
 local num_tabs = 5
 local storage_version = 1
+local wand_storage_changed = true
+local item_storage_changed = true
 
 local function split_string(inputstr, sep)
   sep = sep or "%s"
@@ -121,67 +123,85 @@ end
 
 function get_stored_wands(tab_number)
 	tab_number = tab_number or 1
-	local wand_storage = EntityGetWithName("wand_storage_container")
-	if wand_storage > 0 then
-		local tab_entity = get_tab_entity(wand_storage, tab_number)
-		local serialized_wands = EntityGetAllChildren(tab_entity) or {}
-		for i, container_entity_id in ipairs(serialized_wands) do
-			local serialized_ez, serialized_poly
-			for i, comp in ipairs(EntityGetComponentIncludingDisabled(container_entity_id, "VariableStorageComponent")) do
-				if ComponentGetValue2(comp, "name") == "serialized_ez" then
-					serialized_ez = ComponentGetValue2(comp, "value_string")
-				end
-				if ComponentGetValue2(comp, "name") == "serialized_poly" then
-					serialized_poly = ComponentGetValue2(comp, "value_string")
-				end
-			end
-			local wand = EZWand.Deserialize(serialized_ez)
-			if ends_with(wand.sprite_image_file, ".xml") then
-				wand.sprite_image_file = get_xml_sprite(wand.sprite_image_file)
-			end
-			wand.container_entity_id = container_entity_id
-			wand.serialized_poly = serialized_poly
-			serialized_wands[i] = wand
-		end
-		return serialized_wands
+	if not wand_storage_changed then
+		return cached_stored_wands
 	else
-		return {}
+		local wand_storage = EntityGetWithName("wand_storage_container")
+		local out = {}
+		if wand_storage > 0 then
+			local tab_entity = get_tab_entity(wand_storage, tab_number)
+			local serialized_wands = EntityGetAllChildren(tab_entity) or {}
+			for i, container_entity_id in ipairs(serialized_wands) do
+				local serialized_ez, serialized_poly
+				for i, comp in ipairs(EntityGetComponentIncludingDisabled(container_entity_id, "VariableStorageComponent")) do
+					if ComponentGetValue2(comp, "name") == "serialized_ez" then
+						serialized_ez = ComponentGetValue2(comp, "value_string")
+					end
+					if ComponentGetValue2(comp, "name") == "serialized_poly" then
+						serialized_poly = ComponentGetValue2(comp, "value_string")
+					end
+				end
+				local wand = EZWand.Deserialize(serialized_ez)
+				if ends_with(wand.sprite_image_file, ".xml") then
+					wand.sprite_image_file = get_xml_sprite(wand.sprite_image_file)
+				end
+				wand.container_entity_id = container_entity_id
+				wand.serialized_poly = serialized_poly
+				serialized_wands[i] = wand
+			end
+			table.sort(serialized_wands, function (a, b)
+				return a.container_entity_id < b.container_entity_id
+			end)
+			out = serialized_wands
+		end
+		wand_storage_changed = false
+		cached_stored_wands = out
+		return cached_stored_wands
 	end
 end
 
 function get_stored_items(tab_number)
 	tab_number = tab_number or 1
-	local item_storage = EntityGetWithName("item_storage_container")
-	if item_storage > 0 then
-		local tab_entity = get_tab_entity(item_storage, tab_number)
-		local serialized_items = EntityGetAllChildren(tab_entity) or {}
-		for i, container_entity_id in ipairs(serialized_items) do
-			local image_file, potion_color, tooltip, serialized_poly
-			for i, comp in ipairs(EntityGetComponentIncludingDisabled(container_entity_id, "VariableStorageComponent")) do
-				if ComponentGetValue2(comp, "name") == "serialized_image_file" then
-					image_file = ComponentGetValue2(comp, "value_string")
-				end
-				if ComponentGetValue2(comp, "name") == "serialized_potion_color" then
-					potion_color = ComponentGetValue2(comp, "value_int")
-				end
-				if ComponentGetValue2(comp, "name") == "serialized_tooltip" then
-					tooltip = ComponentGetValue2(comp, "value_string")
-				end
-				if ComponentGetValue2(comp, "name") == "serialized_poly" then
-					serialized_poly = ComponentGetValue2(comp, "value_string")
-				end
-			end
-			local item = {}
-			item.container_entity_id = container_entity_id
-			item.serialized_poly = serialized_poly
-			item.image_file = image_file
-			item.potion_color = potion_color
-			item.tooltip = tooltip
-			serialized_items[i] = item
-		end
-		return serialized_items
+	if not item_storage_changed then
+		return cached_stored_items
 	else
-		return {}
+		local item_storage = EntityGetWithName("item_storage_container")
+		local out = {}
+		if item_storage > 0 then
+			local tab_entity = get_tab_entity(item_storage, tab_number)
+			local serialized_items = EntityGetAllChildren(tab_entity) or {}
+			for i, container_entity_id in ipairs(serialized_items) do
+				local image_file, potion_color, tooltip, serialized_poly
+				for i, comp in ipairs(EntityGetComponentIncludingDisabled(container_entity_id, "VariableStorageComponent")) do
+					if ComponentGetValue2(comp, "name") == "serialized_image_file" then
+						image_file = ComponentGetValue2(comp, "value_string")
+					end
+					if ComponentGetValue2(comp, "name") == "serialized_potion_color" then
+						potion_color = ComponentGetValue2(comp, "value_int")
+					end
+					if ComponentGetValue2(comp, "name") == "serialized_tooltip" then
+						tooltip = ComponentGetValue2(comp, "value_string")
+					end
+					if ComponentGetValue2(comp, "name") == "serialized_poly" then
+						serialized_poly = ComponentGetValue2(comp, "value_string")
+					end
+				end
+				local item = {}
+				item.container_entity_id = container_entity_id
+				item.serialized_poly = serialized_poly
+				item.image_file = image_file
+				item.potion_color = potion_color
+				item.tooltip = tooltip
+				serialized_items[i] = item
+			end
+			table.sort(serialized_items, function (a, b)
+				return a.container_entity_id < b.container_entity_id
+			end)
+			out = serialized_items
+		end
+		item_storage_changed = false
+		cached_stored_items = out
+		return cached_stored_items
 	end
 end
 
@@ -279,6 +299,7 @@ function put_wand_in_storage(wand, tab_number)
 		local new_entry = create_storage_entity(ez, poly)
 		local tab_entity = get_tab_entity(wand_storage, tab_number)
 		EntityAddChild(tab_entity, new_entry)
+		wand_storage_changed = true
 	end
 end
 
@@ -343,6 +364,7 @@ function put_item_in_storage(item, tab_number)
 		local new_entry = create_item_storage_entity(image_file, potion_color ,tooltip, poly)
 		local tab_entity = get_tab_entity(item_storage, tab_number)
 		EntityAddChild(tab_entity, new_entry)
+		item_storage_changed = true
 	end
 end
 
@@ -505,6 +527,10 @@ function retrieve_or_swap_wand(wand, tab_number)
 		if inventory_slot or first_free_wand_slot then
 			create_and_pick_up_wand(wand.serialized_poly, inventory_slot or first_free_wand_slot)
 			EntityKill(wand.container_entity_id)
+			async(function()
+				wait(0)
+				wand_storage_changed = true
+			end)
 		end
 	end
 end
@@ -532,6 +558,10 @@ function retrieve_or_swap_item(item, tab_number)
 		if inventory_slot or first_free_item_slot then
 			create_and_pick_up_item(item.serialized_poly, (inventory_slot or first_free_item_slot) + 4)
 			EntityKill(item.container_entity_id)
+			async(function()
+				wait(0)
+				item_storage_changed = true
+			end)
 		end
 	end
 end
@@ -749,6 +779,7 @@ function OnWorldPreUpdate()
 			local is_active_wand_tab = function() return active_wand_tab == i end
 			if GuiImageButton(gui, new_id(), origin_x - 16, origin_y + 5 + (i-1) * 17, "", "mods/InventoryBags/files/tab_left_empty" .. (is_active_wand_tab() and "_active" or "") .. ".png") then
 				active_wand_tab = i
+				wand_storage_changed = true
 			end
 			if tab_labels.wands[i] ~= "" then
 				GuiTooltip(gui, tab_labels.wands[i], "")
@@ -760,6 +791,7 @@ function OnWorldPreUpdate()
 			local is_active_item_tab = function() return active_item_tab == i end
 			if GuiImageButton(gui, new_id(), origin_x + 157, origin_y + 5 + (i-1) * 17, "", "mods/InventoryBags/files/tab_right_empty" .. (is_active_item_tab() and "_active" or "") .. ".png") then
 				active_item_tab = i
+				item_storage_changed = true
 			end
 			if tab_labels.items[i] ~= "" then
 				GuiTooltip(gui, tab_labels.items[i], "")
