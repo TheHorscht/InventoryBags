@@ -1,3 +1,7 @@
+v0.5.1:
+- Block mouse clicks on the bag interface, to prevent accidental wand firing while taking something out and clicking in the gaps.
+- Fix ordering problem when swapping items.
+
 v0.5.0:
 - Add tabs to allow better organizing of wands and items (with customizable labels, check mod settings).
 - The GUI will now expand as soon as it is "full", to better indicate that it expands automatically and you can keep adding stuff forever.
