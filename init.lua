@@ -689,6 +689,8 @@ end
 button_pos_x = ModSettingGet("InventoryBags.pos_x")
 button_pos_y = ModSettingGet("InventoryBags.pos_y")
 button_locked = ModSettingGet("InventoryBags.locked")
+show_wand_bag = ModSettingGet("InventoryBags.show_wand_bag")
+show_item_bag = ModSettingGet("InventoryBags.show_item_bag")
 
 local tab_labels = {
 	wands = {},
@@ -714,6 +716,8 @@ function OnPausedChanged(is_paused, is_inventory_pause)
 		button_pos_y = ModSettingGet("InventoryBags.pos_y")
 	end
 	button_locked = ModSettingGet("InventoryBags.locked")
+	show_wand_bag = ModSettingGet("InventoryBags.show_wand_bag")
+	show_item_bag = ModSettingGet("InventoryBags.show_item_bag")
 	load_label_settings()
 end
 
@@ -764,171 +768,180 @@ function OnWorldPreUpdate()
 		local box_width = slot_width_total * 4
 		local box_height_wands = slot_height_total * (rows_wands+1) + spacer
 		local box_height_items = slot_height_total * (rows_items+1) + spacer
-		-- Render wand bag
 		local origin_x, origin_y = 23, 48
-		GuiZSetForNextWidget(gui, 20)
-		GuiImageNinePiece(gui, new_id(), origin_x, origin_y, box_width, box_height_wands, 1, "mods/InventoryBags/files/container_9piece.png", "mods/InventoryBags/files/container_9piece.png")
-		-- Render an invisible image over the whole bag to prevent clicks firing wands
-		for offset_y=0, box_height_wands+8, 10 do
-			GuiZSetForNextWidget(gui, -99999)
-			GuiImage(gui, new_id(), origin_x - 4, origin_y - 4 + offset_y, "mods/InventoryBags/files/invisible_80x10.png", 1, 1, 1)
-		end
-		-- Render tabs
-		for i=1, num_tabs do
-			local add_text_offset = 0
-			if i == 1 then
-				add_text_offset = 1
-			end
-			-- Left side (Wand tabs)
-			GuiZSetForNextWidget(gui, 21)
-			local is_active_wand_tab = function() return active_wand_tab == i end
-			if GuiImageButton(gui, new_id(), origin_x - 16, origin_y + 5 + (i-1) * 17, "", "mods/InventoryBags/files/tab_left_empty" .. (is_active_wand_tab() and "_active" or "") .. ".png") then
-				active_wand_tab = i
-				wand_storage_changed = true
-			end
-			if tab_labels.wands[i] ~= "" then
-				GuiTooltip(gui, tab_labels.wands[i], "")
-			end
-			GuiColorSetForNextWidget(gui, 1, 1, 1, is_active_wand_tab() and 0.8 or 0.5)
-			GuiText(gui, origin_x - 10 + add_text_offset, origin_y + 8 + (i-1) * 17, i)
-			-- Right side (Item tabs)
-			GuiZSetForNextWidget(gui, 21)
-			local is_active_item_tab = function() return active_item_tab == i end
-			if GuiImageButton(gui, new_id(), origin_x + 157, origin_y + 5 + (i-1) * 17, "", "mods/InventoryBags/files/tab_right_empty" .. (is_active_item_tab() and "_active" or "") .. ".png") then
-				active_item_tab = i
-				item_storage_changed = true
-			end
-			if tab_labels.items[i] ~= "" then
-				GuiTooltip(gui, tab_labels.items[i], "")
-			end
-			GuiColorSetForNextWidget(gui, 1, 1, 1, is_active_item_tab() and 0.8 or 0.5)
-			GuiText(gui, origin_x + 159 + add_text_offset, origin_y + 8 + (i-1) * 17, i)
-		end
+		-- Render wand bag
 		local tooltip_wand
-		local taken_slots = {}
-		-- Render the held wands and save the taken positions so we can render the empty slots after this
-		for i, wand in ipairs(held_wands) do
-			if wand then
-				taken_slots[wand.inventory_slot] = true
-				if GuiImageButton(gui, new_id(), origin_x + slot_margin + wand.inventory_slot * slot_width_total, origin_y + slot_margin, "", "data/ui_gfx/inventory/inventory_box.png") then
-					async(function()
-						put_wand_in_storage(wand.entity_id, active_wand_tab)
-					end)
-				end
-				local _, _, hovered, x, y, width, height = GuiGetPreviousWidgetInfo(gui)
-				local w, h = GuiGetImageDimensions(gui, wand.image_file, 1) -- scale
-				local scale = hovered and 1.2 or 1
-				if hovered then
-					tooltip_wand = EZWand.Deserialize(EZWand(wand.entity_id):Serialize()) --wand.entity_id
-				end
-				GuiZSetForNextWidget(gui, -9)
-				if wand.active then
-					GuiImage(gui, new_id(), x + (width / 2 - (16 * scale) / 2), y + (height / 2 - (16 * scale) / 2), "mods/InventoryBags/files/highlight_box.png", 1, scale, scale)
-				end
-				GuiZSetForNextWidget(gui, -10)
-				GuiImage(gui, new_id(), x + (width / 2 - (w * scale) / 2), y + (height / 2 - (h * scale) / 2), wand.image_file, 1, scale, scale, 0, GUI_RECT_ANIMATION_PLAYBACK.Loop)
+		if show_wand_bag then
+			GuiZSetForNextWidget(gui, 20)
+			GuiImageNinePiece(gui, new_id(), origin_x, origin_y, box_width, box_height_wands, 1, "mods/InventoryBags/files/container_9piece.png", "mods/InventoryBags/files/container_9piece.png")
+			-- Render an invisible image over the whole bag to prevent clicks firing wands
+			for offset_y=0, box_height_wands+8, 10 do
+				GuiZSetForNextWidget(gui, -99999)
+				GuiImage(gui, new_id(), origin_x - 4, origin_y - 4 + offset_y, "mods/InventoryBags/files/invisible_80x10.png", 1, 1, 1)
 			end
-		end
-		for i=0, (4-1) do
-			if not taken_slots[i] then
-				GuiImage(gui, new_id(), origin_x + slot_margin + i * slot_width_total, origin_y + slot_margin, "data/ui_gfx/inventory/inventory_box.png", 1, 1, 1)
+			-- Render tabs
+			for i=1, num_tabs do
+				local add_text_offset = 0
+				if i == 1 then
+					add_text_offset = 1
+				end
+				GuiZSetForNextWidget(gui, 21)
+				local is_active_wand_tab = function() return active_wand_tab == i end
+				if GuiImageButton(gui, new_id(), origin_x - 16, origin_y + 5 + (i-1) * 17, "", "mods/InventoryBags/files/tab_left_empty" .. (is_active_wand_tab() and "_active" or "") .. ".png") then
+					active_wand_tab = i
+					wand_storage_changed = true
+				end
+				if tab_labels.wands[i] ~= "" then
+					GuiTooltip(gui, tab_labels.wands[i], "")
+				end
+				GuiColorSetForNextWidget(gui, 1, 1, 1, is_active_wand_tab() and 0.8 or 0.5)
+				GuiText(gui, origin_x - 10 + add_text_offset, origin_y + 8 + (i-1) * 17, i)
 			end
-		end
-		for iy=0, (rows_wands-1) do
-			for ix=0, (4-1) do
-				local wand = stored_wands[(iy*4 + ix) + 1]
+			local taken_slots = {}
+			-- Render the held wands and save the taken positions so we can render the empty slots after this
+			for i, wand in ipairs(held_wands) do
 				if wand then
-					if GuiImageButton(gui, new_id(), origin_x + slot_margin + ix * slot_width_total, origin_y + spacer + slot_margin + slot_height_total + iy * slot_height_total, "", "data/ui_gfx/inventory/inventory_box.png") then
+					taken_slots[wand.inventory_slot] = true
+					if GuiImageButton(gui, new_id(), origin_x + slot_margin + wand.inventory_slot * slot_width_total, origin_y + slot_margin, "", "data/ui_gfx/inventory/inventory_box.png") then
 						async(function()
-							retrieve_or_swap_wand(wand, active_wand_tab)
+							put_wand_in_storage(wand.entity_id, active_wand_tab)
 						end)
 					end
 					local _, _, hovered, x, y, width, height = GuiGetPreviousWidgetInfo(gui)
-					local w, h = GuiGetImageDimensions(gui, wand.sprite_image_file, 1) -- scale
+					local w, h = GuiGetImageDimensions(gui, wand.image_file, 1) -- scale
 					local scale = hovered and 1.2 or 1
 					if hovered then
-						tooltip_wand = wand
+						tooltip_wand = EZWand.Deserialize(EZWand(wand.entity_id):Serialize()) --wand.entity_id
+					end
+					GuiZSetForNextWidget(gui, -9)
+					if wand.active then
+						GuiImage(gui, new_id(), x + (width / 2 - (16 * scale) / 2), y + (height / 2 - (16 * scale) / 2), "mods/InventoryBags/files/highlight_box.png", 1, scale, scale)
 					end
 					GuiZSetForNextWidget(gui, -10)
-					GuiImage(gui, new_id(), x + (width / 2 - (w * scale) / 2), y + (height / 2 - (h *scale) / 2), wand.sprite_image_file, 1, scale, scale, 0, GUI_RECT_ANIMATION_PLAYBACK.Loop)
-				else
-					GuiImage(gui, new_id(), origin_x + slot_margin + ix * slot_width_total, origin_y + spacer + slot_margin + slot_height_total + iy * slot_height_total, "data/ui_gfx/inventory/inventory_box.png", 1, 1, 1)
+					GuiImage(gui, new_id(), x + (width / 2 - (w * scale) / 2), y + (height / 2 - (h * scale) / 2), wand.image_file, 1, scale, scale, 0, GUI_RECT_ANIMATION_PLAYBACK.Loop)
+				end
+			end
+			for i=0, (4-1) do
+				if not taken_slots[i] then
+					GuiImage(gui, new_id(), origin_x + slot_margin + i * slot_width_total, origin_y + slot_margin, "data/ui_gfx/inventory/inventory_box.png", 1, 1, 1)
+				end
+			end
+			for iy=0, (rows_wands-1) do
+				for ix=0, (4-1) do
+					local wand = stored_wands[(iy*4 + ix) + 1]
+					if wand then
+						if GuiImageButton(gui, new_id(), origin_x + slot_margin + ix * slot_width_total, origin_y + spacer + slot_margin + slot_height_total + iy * slot_height_total, "", "data/ui_gfx/inventory/inventory_box.png") then
+							async(function()
+								retrieve_or_swap_wand(wand, active_wand_tab)
+							end)
+						end
+						local _, _, hovered, x, y, width, height = GuiGetPreviousWidgetInfo(gui)
+						local w, h = GuiGetImageDimensions(gui, wand.sprite_image_file, 1) -- scale
+						local scale = hovered and 1.2 or 1
+						if hovered then
+							tooltip_wand = wand
+						end
+						GuiZSetForNextWidget(gui, -10)
+						GuiImage(gui, new_id(), x + (width / 2 - (w * scale) / 2), y + (height / 2 - (h *scale) / 2), wand.sprite_image_file, 1, scale, scale, 0, GUI_RECT_ANIMATION_PLAYBACK.Loop)
+					else
+						GuiImage(gui, new_id(), origin_x + slot_margin + ix * slot_width_total, origin_y + spacer + slot_margin + slot_height_total + iy * slot_height_total, "data/ui_gfx/inventory/inventory_box.png", 1, 1, 1)
+					end
 				end
 			end
 		end
 		-- Render item bag
-		origin_x = origin_x + box_width + 9
-		GuiZSetForNextWidget(gui, 20)
-		GuiImageNinePiece(gui, new_id(), origin_x, origin_y, box_width, box_height_items, 1, "mods/InventoryBags/files/container_9piece.png", "mods/InventoryBags/files/container_9piece.png")
-		-- Render an invisible image over the whole bag to prevent clicks firing wands
-		for offset_y=0, box_height_items+8, 10 do
-			GuiZSetForNextWidget(gui, -99999)
-			GuiImage(gui, new_id(), origin_x - 4, origin_y - 4 + offset_y, "mods/InventoryBags/files/invisible_80x10.png", 1, 1, 1)
-		end
 		local tooltip_item
-		local taken_slots = {}
-		-- Render the held items and save the taken positions so we can render the empty slots after this
-		for i, item in ipairs(held_items) do
-			if item then
-				taken_slots[item.inventory_slot] = true
-				if GuiImageButton(gui, new_id(), origin_x + slot_margin + item.inventory_slot * slot_width_total, origin_y + slot_margin, "", "data/ui_gfx/inventory/inventory_box.png") then
-					async(function()
-						put_item_in_storage(item.entity_id, active_item_tab)
-					end)
-				end
-				local _, _, hovered, x, y, width, height = GuiGetPreviousWidgetInfo(gui)
-				local w, h = GuiGetImageDimensions(gui, item.image_file, 1)
-				local scale = hovered and 1.2 or 1
-				if hovered then
-					local image_file, potion_color, tooltip = tooltipify_item(item.entity_id)
-					tooltip_item = tooltip
-				end
-				GuiZSetForNextWidget(gui, -9)
-				if item.active then
-					GuiImage(gui, new_id(), x + (width / 2 - (16 * scale) / 2), y + (height / 2 - (16 * scale) / 2), "mods/InventoryBags/files/highlight_box.png", 1, scale, scale)
-				end
-				GuiZSetForNextWidget(gui, -10)
-				local potion_color = GameGetPotionColorUint(item.entity_id)
-				if potion_color ~= 0 then
-					local b = bit.rshift(bit.band(potion_color, 0xFF0000), 16) / 0xFF
-					local g = bit.rshift(bit.band(potion_color, 0xFF00), 8) / 0xFF
-					local r = bit.band(potion_color, 0xFF) / 0xFF
-					GuiColorSetForNextWidget(gui, r, g, b, 1)
-				end
-				GuiImage(gui, new_id(), x + (width / 2 - (w * scale) / 2), y + (height / 2 - (h * scale) / 2), item.image_file, 1, scale, scale, 0, GUI_RECT_ANIMATION_PLAYBACK.Loop)
+		if show_item_bag then
+			origin_x = origin_x + box_width + 9
+			GuiZSetForNextWidget(gui, 20)
+			GuiImageNinePiece(gui, new_id(), origin_x, origin_y, box_width, box_height_items, 1, "mods/InventoryBags/files/container_9piece.png", "mods/InventoryBags/files/container_9piece.png")
+			-- Render an invisible image over the whole bag to prevent clicks firing wands
+			for offset_y=0, box_height_items+8, 10 do
+				GuiZSetForNextWidget(gui, -99999)
+				GuiImage(gui, new_id(), origin_x - 4, origin_y - 4 + offset_y, "mods/InventoryBags/files/invisible_80x10.png", 1, 1, 1)
 			end
-		end
-		for i=0, (4-1) do
-			if not taken_slots[i] then
-				GuiImage(gui, new_id(), origin_x + slot_margin + i * slot_width_total, origin_y + slot_margin, "data/ui_gfx/inventory/inventory_box.png", 1, 1, 1)
+			-- Render tabs
+			for i=1, num_tabs do
+				local add_text_offset = 0
+				if i == 1 then
+					add_text_offset = 1
+				end
+				GuiZSetForNextWidget(gui, 21)
+				local is_active_item_tab = function() return active_item_tab == i end
+				if GuiImageButton(gui, new_id(), origin_x + 76, origin_y + 5 + (i-1) * 17, "", "mods/InventoryBags/files/tab_right_empty" .. (is_active_item_tab() and "_active" or "") .. ".png") then
+					active_item_tab = i
+					item_storage_changed = true
+				end
+				if tab_labels.items[i] ~= "" then
+					GuiTooltip(gui, tab_labels.items[i], "")
+				end
+				GuiColorSetForNextWidget(gui, 1, 1, 1, is_active_item_tab() and 0.8 or 0.5)
+				GuiText(gui, origin_x + 78 + add_text_offset, origin_y + 8 + (i-1) * 17, i)
 			end
-		end
-		for iy=0, (rows_items-1) do
-			for ix=0, (4-1) do
-				local item = stored_items[(iy*4 + ix) + 1]
+			local taken_slots = {}
+			-- Render the held items and save the taken positions so we can render the empty slots after this
+			for i, item in ipairs(held_items) do
 				if item then
-					if GuiImageButton(gui, new_id(), origin_x + slot_margin + ix * slot_width_total, origin_y + spacer + slot_margin + slot_height_total + iy * slot_height_total, "", "data/ui_gfx/inventory/inventory_box.png") then
+					taken_slots[item.inventory_slot] = true
+					if GuiImageButton(gui, new_id(), origin_x + slot_margin + item.inventory_slot * slot_width_total, origin_y + slot_margin, "", "data/ui_gfx/inventory/inventory_box.png") then
 						async(function()
-							retrieve_or_swap_item(item, active_item_tab)
+							put_item_in_storage(item.entity_id, active_item_tab)
 						end)
 					end
 					local _, _, hovered, x, y, width, height = GuiGetPreviousWidgetInfo(gui)
 					local w, h = GuiGetImageDimensions(gui, item.image_file, 1)
 					local scale = hovered and 1.2 or 1
 					if hovered then
-						tooltip_item = item.tooltip
+						local image_file, potion_color, tooltip = tooltipify_item(item.entity_id)
+						tooltip_item = tooltip
+					end
+					GuiZSetForNextWidget(gui, -9)
+					if item.active then
+						GuiImage(gui, new_id(), x + (width / 2 - (16 * scale) / 2), y + (height / 2 - (16 * scale) / 2), "mods/InventoryBags/files/highlight_box.png", 1, scale, scale)
 					end
 					GuiZSetForNextWidget(gui, -10)
-					local potion_color = item.potion_color
+					local potion_color = GameGetPotionColorUint(item.entity_id)
 					if potion_color ~= 0 then
 						local b = bit.rshift(bit.band(potion_color, 0xFF0000), 16) / 0xFF
 						local g = bit.rshift(bit.band(potion_color, 0xFF00), 8) / 0xFF
 						local r = bit.band(potion_color, 0xFF) / 0xFF
 						GuiColorSetForNextWidget(gui, r, g, b, 1)
 					end
-					GuiImage(gui, new_id(), x + (width / 2 - (w * scale) / 2), y + (height / 2 - (h *scale) / 2), item.image_file, 1, scale, scale, 0, GUI_RECT_ANIMATION_PLAYBACK.Loop)
-				else
-					GuiImage(gui, new_id(), origin_x + slot_margin + ix * slot_width_total, origin_y + spacer + slot_margin + slot_height_total + iy * slot_height_total, "data/ui_gfx/inventory/inventory_box.png", 1, 1, 1)
+					GuiImage(gui, new_id(), x + (width / 2 - (w * scale) / 2), y + (height / 2 - (h * scale) / 2), item.image_file, 1, scale, scale, 0, GUI_RECT_ANIMATION_PLAYBACK.Loop)
+				end
+			end
+			for i=0, (4-1) do
+				if not taken_slots[i] then
+					GuiImage(gui, new_id(), origin_x + slot_margin + i * slot_width_total, origin_y + slot_margin, "data/ui_gfx/inventory/inventory_box.png", 1, 1, 1)
+				end
+			end
+			for iy=0, (rows_items-1) do
+				for ix=0, (4-1) do
+					local item = stored_items[(iy*4 + ix) + 1]
+					if item then
+						if GuiImageButton(gui, new_id(), origin_x + slot_margin + ix * slot_width_total, origin_y + spacer + slot_margin + slot_height_total + iy * slot_height_total, "", "data/ui_gfx/inventory/inventory_box.png") then
+							async(function()
+								retrieve_or_swap_item(item, active_item_tab)
+							end)
+						end
+						local _, _, hovered, x, y, width, height = GuiGetPreviousWidgetInfo(gui)
+						local w, h = GuiGetImageDimensions(gui, item.image_file, 1)
+						local scale = hovered and 1.2 or 1
+						if hovered then
+							tooltip_item = item.tooltip
+						end
+						GuiZSetForNextWidget(gui, -10)
+						local potion_color = item.potion_color
+						if potion_color ~= 0 then
+							local b = bit.rshift(bit.band(potion_color, 0xFF0000), 16) / 0xFF
+							local g = bit.rshift(bit.band(potion_color, 0xFF00), 8) / 0xFF
+							local r = bit.band(potion_color, 0xFF) / 0xFF
+							GuiColorSetForNextWidget(gui, r, g, b, 1)
+						end
+						GuiImage(gui, new_id(), x + (width / 2 - (w * scale) / 2), y + (height / 2 - (h *scale) / 2), item.image_file, 1, scale, scale, 0, GUI_RECT_ANIMATION_PLAYBACK.Loop)
+					else
+						GuiImage(gui, new_id(), origin_x + slot_margin + ix * slot_width_total, origin_y + spacer + slot_margin + slot_height_total + iy * slot_height_total, "data/ui_gfx/inventory/inventory_box.png", 1, 1, 1)
+					end
 				end
 			end
 		end

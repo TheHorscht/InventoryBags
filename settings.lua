@@ -38,6 +38,18 @@ mod_settings =
 		scope = MOD_SETTING_SCOPE_RUNTIME,
 	},
 	{
+		id = "show_wand_bag",
+		ui_name = "Show wand bag",
+		value_default = true,
+		scope = MOD_SETTING_SCOPE_RUNTIME,
+	},
+	{
+		id = "show_item_bag",
+		ui_name = "Show item bag",
+		value_default = true,
+		scope = MOD_SETTING_SCOPE_RUNTIME,
+	},
+	{
 		category_id = "tab_labels",
 		ui_name = "Tab Labels",
 		ui_description = "Labels for the tabs when hovering over them.\nKeep the mouse hovered over these text fields to enter text.",

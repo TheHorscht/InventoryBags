@@ -1,5 +1,6 @@
-UNRELEASED:
+v0.5.2:
 - Fix item being shown for 1 frame outside the bag when swapping items
+- Add setting to hide/show individual bags
 
 v0.5.1:
 - Block mouse clicks on the bag interface, to prevent accidental wand firing while taking something out and clicking in the gaps.
