@@ -110,7 +110,7 @@ function get_held_items()
 				table.insert(items, {
 					entity_id = item,
 					image_file = image_file,
-					inventory_slot = get_inventory_position(item),
+					inventory_slot = get_inventory_position(item) % 4,
 					active = item == active_item
 				})
 			end

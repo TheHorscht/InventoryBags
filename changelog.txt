@@ -1,3 +1,6 @@
+UNRELEASED:
+- Fix item being shown for 1 frame outside the bag when swapping items
+
 v0.5.1:
 - Block mouse clicks on the bag interface, to prevent accidental wand firing while taking something out and clicking in the gaps.
 - Fix ordering problem when swapping items.
