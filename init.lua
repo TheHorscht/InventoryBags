@@ -9,6 +9,11 @@ local polytools = dofile_once("mods/InventoryBags/lib/polytools/polytools.lua")
 local nxml = dofile_once("mods/InventoryBags/lib/nxml.lua")
 local EZWand = dofile_once("mods/InventoryBags/lib/EZWand/EZWand.lua")
 
+if ModIsEnabled("mnee") then
+	ModLuaFileAppend("mods/mnee/bindings.lua", "mods/InventoryBags/mnee.lua")
+	dofile_once("mods/mnee/lib.lua")
+end
+
 local num_tabs = 5
 local storage_version = 1
 local wand_storage_changed = true
@@ -750,7 +755,8 @@ function OnWorldPreUpdate()
 		end
 	end
 	-- Toggle it open/closed
-	if not inventory_open and GuiImageButton(gui, new_id(), button_pos_x, button_pos_y, "", "mods/InventoryBags/files/gui_button.png") then
+	if not inventory_open and (GuiImageButton(gui, new_id(), button_pos_x, button_pos_y, "", "mods/InventoryBags/files/gui_button.png")
+		or ModIsEnabled("mnee") and get_binding_pressed("InvBags", "toggle")) then
 		open = not open
 	end
 
