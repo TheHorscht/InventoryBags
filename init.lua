@@ -624,6 +624,7 @@ local function get_spell_bg(action_id)
 end
 
 function OnPlayerSpawned(player)
+	GlobalsSetValue("InventoryBags_is_open", "0")
 	if not spell_lookup then
 		spell_lookup = {}
 		dofile_once("data/scripts/gun/gun_actions.lua")
@@ -758,6 +759,7 @@ function OnWorldPreUpdate()
 	if not inventory_open and (GuiImageButton(gui, new_id(), button_pos_x, button_pos_y, "", "mods/InventoryBags/files/gui_button.png")
 		or ModIsEnabled("mnee") and get_binding_pressed("InvBags", "toggle")) then
 		open = not open
+		GlobalsSetValue("InventoryBags_is_open", open and 1 or 0)
 	end
 
 	if open and not inventory_open then
