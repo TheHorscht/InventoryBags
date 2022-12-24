@@ -1,3 +1,6 @@
+v0.5.5:
+- Fix wand duplication bug (hopefully)
+
 v0.5.4:
 - For mod developers: Added a way to check if the bag is open or not: GlobalsGetValue("InventoryBags_is_open", "0"), will be "1" if it's open, otherwise "0"
 

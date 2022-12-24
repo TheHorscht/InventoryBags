@@ -14,6 +14,9 @@ if ModIsEnabled("mnee") then
 	dofile_once("mods/mnee/lib.lua")
 end
 
+local poly_place_x = 6666666
+local poly_place_y = 6666666
+
 local num_tabs = 5
 local storage_version = 1
 local wand_storage_changed = true
@@ -227,11 +230,19 @@ function serialize_entity(entity)
 		error("serialize_entity() must be called from inside an async function", 2)
 	end
 	EntityRemoveFromParent(entity)
-	EntityApplyTransform(entity, 6666666, 6666666)
+	-- Need to do this because we poly the entity and thus lose the reference to it,
+	-- because the polymorphed entity AND the one that it turns back into both have different entity_ids than the original
+	-- That's why we first move it to some location where it will hopefully be the only entity, so we can later get it back
+	-- But this also means that this location will be saved in the serialized string, and when it gets deserialized,
+	-- will spawn there again (Test this later to confirm!!! Too lazy right now)
+	EntityApplyTransform(entity, poly_place_x, poly_place_y)
 	local serialized = polytools.save(entity)
 	wait(0)
-	entity = EntityGetInRadius(6666666, 6666666, 5)[1]
-	EntityKill(entity)
+	-- Kill the wand AND call cards IF for some unknown reason they are also detected with EntityGetInRadius
+	for i, v in ipairs(EntityGetInRadius(poly_place_x, poly_place_y, 5)) do
+		EntityRemoveFromParent(v)
+		EntityKill(v)
+	end
 	return serialized
 end
 
@@ -241,10 +252,10 @@ function deserialize_entity(str)
 	end
 	-- Move the entity to a unique location so that we can get a reference to the entity with EntityGetInRadius once polymorph wears off
 	-- Apply polymorph which, when it runs out after 1 frame will turn the entity back into it's original form, which we provide
-	polytools.spawn(666666, 666666, str)
+	polytools.spawn(poly_place_x, poly_place_y, str) -- x, y is irrelevant since entity retains its old location
 	-- Wait 1 frame for the polymorph to wear off
 	wait(0)
-	local all_entities = EntityGetInRadius(666666, 666666, 3)
+	local all_entities = EntityGetInRadius(poly_place_x, poly_place_y, 3)
 	return EntityGetRootEntity(all_entities[1])
 end
 
@@ -436,6 +447,9 @@ function create_and_pick_up_wand(serialized, slot)
 	GamePickUpInventoryItem(EntityGetWithTag("player_unit")[1], new_wand, false)
 	set_inventory_position(new_wand, new_slot)
 	local inventory = get_inventory()
+	-- For some reason this is neccessary because even though new_wand doesn't have a parent
+	-- and EntityGetParent even returns 0, it still complains that "Error: child already has a parent!"
+	EntityRemoveFromParent(new_wand)
 	EntityAddChild(inventory, new_wand)
 	-- /"Pick up" wand and place it in inventory
 
