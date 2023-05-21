@@ -755,6 +755,9 @@ function OnWorldPreUpdate()
 		return current_id
 	end
 	GuiStartFrame(gui)
+	if GameGetIsGamepadConnected() then
+		GuiOptionsAdd(gui, GUI_OPTION.NonInteractive)
+	end
 	GuiOptionsAdd(gui, GUI_OPTION.NoPositionTween)
 
 	local inventory_open = is_inventory_open()

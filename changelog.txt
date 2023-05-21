@@ -1,3 +1,6 @@
+v0.5.8:
+- Disable GUI interactivity when gamepad is connected
+
 v0.5.7:
 - Fix only one spell being rendered in the tooltips when a new wand has been picked up and
   the Noita inventory has not been opened yet to assign the correct slot order of spells.
