@@ -143,7 +143,7 @@ function get_stored_wands(tab_number)
 			local serialized_wands = EntityGetAllChildren(tab_entity) or {}
 			for i, container_entity_id in ipairs(serialized_wands) do
 				local serialized_ez, serialized_poly
-				for i, comp in ipairs(EntityGetComponentIncludingDisabled(container_entity_id, "VariableStorageComponent")) do
+				for i, comp in ipairs(EntityGetComponentIncludingDisabled(container_entity_id, "VariableStorageComponent") or {}) do
 					if ComponentGetValue2(comp, "name") == "serialized_ez" then
 						serialized_ez = ComponentGetValue2(comp, "value_string")
 					end
@@ -766,10 +766,23 @@ end
 
 local active_wand_tab = 1
 local active_item_tab = 1
+local was_polymorphed = false
 
 function OnWorldPreUpdate()
 	-- This is for making async functions work
 	wake_up_waiting_threads(1)
+	-- Detect polymorph
+	local player = EntityGetWithTag("player_unit")[1]
+	if not player then
+		was_polymorphed = true
+		return
+	end
+	if was_polymorphed then
+		was_polymorphed = false
+		wand_storage_changed = true
+		item_storage_changed = true
+	end
+
 	gui = gui or GuiCreate()
 	open = open or false
 	current_id = 1
