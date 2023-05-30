@@ -111,16 +111,18 @@ function get_held_items()
 		for i, item in ipairs(EntityGetAllChildren(inventory) or {}) do
 			if is_item(item) then
 				local item_component = EntityGetFirstComponentIncludingDisabled(item, "ItemComponent")
-				local image_file = ComponentGetValue2(item_component, "ui_sprite")
-				if ends_with(image_file, ".xml") then
-					image_file = get_xml_sprite(image_file)
+				if item_component then
+					local image_file = ComponentGetValue2(item_component, "ui_sprite")
+					if ends_with(image_file, ".xml") then
+						image_file = get_xml_sprite(image_file)
+					end
+					table.insert(items, {
+						entity_id = item,
+						image_file = image_file,
+						inventory_slot = get_inventory_position(item) % 4,
+						active = item == active_item
+					})
 				end
-				table.insert(items, {
-					entity_id = item,
-					image_file = image_file,
-					inventory_slot = get_inventory_position(item) % 4,
-					active = item == active_item
-				})
 			end
 		end
 		return items
@@ -323,13 +325,19 @@ function tooltipify_item(item)
 	local ability_component = EntityGetFirstComponentIncludingDisabled(item, "AbilityComponent")
 	local item_component = EntityGetFirstComponentIncludingDisabled(item, "ItemComponent")
 	local potion_component = EntityGetFirstComponentIncludingDisabled(item, "PotionComponent")
+	if not item_component then
+		return "data/ui_gfx/gun_actions/unidentified.png", 0, "Something went wrong :[\n \nNo ItemComponent found"
+	end
 	local description = ComponentGetValue2(item_component, "ui_description")
 	description = GameTextGetTranslatedOrNot(description)
 	local material_inventory_lines = ""
-	local item_name = ComponentGetValue2(ability_component, "ui_name")
+	local item_name
+	if ability_component then
+		item_name = ComponentGetValue2(ability_component, "ui_name")
+	end
 	-- Item name is either stored on AbilityComponent:ui_name or if that doesn't exist, ItemComponent:item_name
 	if not item_name then
-		item_name = ComponentGetValue2(item_component, "item_name")
+		item_name = ComponentGetValue2(item_component, "item_name") or "ERROR"
 	end
 	if potion_component then
 		local main_material_id = GetMaterialInventoryMainMaterial(item)
@@ -337,15 +345,28 @@ function tooltipify_item(item)
 		main_material = GameTextGetTranslatedOrNot(main_material)
 		local material_inventory_component = EntityGetFirstComponentIncludingDisabled(item, "MaterialInventoryComponent")
 		local material_sucker_component = EntityGetFirstComponentIncludingDisabled(item, "MaterialSuckerComponent")
-		local barrel_size = ComponentGetValue2(material_sucker_component, "barrel_size")
-		local count_per_material_type = ComponentGetValue2(material_inventory_component, "count_per_material_type")
+		local barrel_size = 1000
+		if material_sucker_component then
+			barrel_size = ComponentGetValue2(material_sucker_component, "barrel_size")
+		end
+		local count_per_material_type = {}
+		if material_inventory_component then
+			count_per_material_type = ComponentGetValue2(material_inventory_component, "count_per_material_type")
+		end
 		local total_amount = 0
+		-- Apparently there's a bug where sometimes it generates millions of newlines? Could not reproduce it.
+		-- But let's try to prevent that from happening anyways by only allowing some max number of iterations.
+		local current_iterations = 0
 		for material_id, amount in pairs(count_per_material_type) do
 			if amount > 0 then
 				total_amount = total_amount + amount
 				local material_name = CellFactory_GetUIName(material_id-1)
 				material_name = GameTextGetTranslatedOrNot(material_name)
 				material_inventory_lines = material_inventory_lines .. ("%s (%d)"):format(material_name:gsub("^%l", string.upper), amount) .. "\n"
+				current_iterations = current_iterations + 1
+				if current_iterations >= 30 then
+					break
+				end
 			end
 		end
 		local fill_percent = math.ceil((total_amount / barrel_size) * 100)
@@ -356,8 +377,10 @@ function tooltipify_item(item)
 
 	local potion_color = GameGetPotionColorUint(item)
 	local tooltip = item_name .. "\n \n"
-	tooltip = tooltip .. description .. "\n \n"
-	tooltip = tooltip .. material_inventory_lines
+	tooltip = tooltip .. description
+	if material_inventory_lines ~= "" then
+		tooltip = tooltip .. "\n \n" .. material_inventory_lines
+	end
 	local image_file = ComponentGetValue2(item_component, "ui_sprite")
 	if ends_with(image_file, ".xml") then
 		image_file = get_xml_sprite(image_file)
