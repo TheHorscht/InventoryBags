@@ -1,3 +1,6 @@
+UNRELEASED:
+- Fix savefile getting flooded with more and more newlines after every game reload.
+
 v0.5.9:
 - FIX: Duplication bug when taking something out after being polymorphed
 - Add some checks to hopefully avoid some weird rare bugs

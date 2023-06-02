@@ -190,7 +190,7 @@ function get_stored_items(tab_number)
 						potion_color = ComponentGetValue2(comp, "value_int")
 					end
 					if ComponentGetValue2(comp, "name") == "serialized_tooltip" then
-						tooltip = ComponentGetValue2(comp, "value_string")
+						tooltip = ComponentGetValue2(comp, "value_string"):gsub("<NEWLINE>", "\n")
 					end
 					if ComponentGetValue2(comp, "name") == "serialized_poly" then
 						serialized_poly = ComponentGetValue2(comp, "value_string")
@@ -294,7 +294,7 @@ function create_item_storage_entity(image_file, potion_color, tooltip, poly)
 	})
 	EntityAddComponent2(entity, "VariableStorageComponent", {
 		name = "serialized_tooltip",
-		value_string = tooltip
+		value_string = tooltip:gsub("\n", "<NEWLINE>")
 	})
 	EntityAddComponent2(entity, "VariableStorageComponent", {
 		name = "serialized_poly",
