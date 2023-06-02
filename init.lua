@@ -577,6 +577,53 @@ function retrieve_or_swap_wand(wand, tab_number)
 	end
 end
 
+local function remove_entity_from_inventory(entity_id)
+	if type(entity_id) ~= "number" then return end
+	EntityRemoveFromParent(entity_id)
+	local player = EntityGetWithTag("player_unit")[1]
+	if player then
+		local inv2 = EntityGetFirstComponentIncludingDisabled(player, "Inventory2Component")
+		if inv2 then
+			local mActiveItem = ComponentGetValue2(inv2, "mActiveItem")
+			if entity_id == mActiveItem then
+				ComponentSetValue2(inv2, "mActiveItem", 0)
+				ComponentSetValue2(inv2, "mActualActiveItem", 0)
+				ComponentSetValue2(inv2, "mForceRefresh", true)
+			end
+		end
+	end
+	return entity_id
+end
+
+local function place_entity_in_front_of_player(entity_id)
+	local player = EntityGetWithTag("player_unit")[1]
+	local target_x, target_y = GameGetCameraPos()
+	if player then
+		local x, y = EntityGetTransform(player)
+		target_x = x
+		target_y = y - 5
+	end
+	EntityApplyTransform(entity_id, target_x, target_y)
+	EntitySetComponentsWithTagEnabled(entity_id, "enabled_in_hand", false)
+	EntitySetComponentsWithTagEnabled(entity_id, "enabled_in_inventory", false)
+	EntitySetComponentsWithTagEnabled(entity_id, "enabled_in_world", true)
+end
+
+function take_out_wand_and_place_it_next_to_player(wand)
+	local entity = remove_entity_from_inventory(wand)
+	if not entity then
+		entity = deserialize_entity(wand.serialized_poly)
+		EntityKill(wand.container_entity_id)
+	end
+	place_entity_in_front_of_player(entity)
+	local vel_comp = EntityGetFirstComponentIncludingDisabled(entity, "VelocityComponent")
+	if vel_comp then
+		ComponentSetValue2(vel_comp, "mVelocity", 0, -100)
+	end
+	wait(0)
+	wand_storage_changed = true
+end
+
 function retrieve_or_swap_item(item, tab_number)
 	if not tab_number then
 		error("Tab number expected", 2)
@@ -606,6 +653,17 @@ function retrieve_or_swap_item(item, tab_number)
 			end)
 		end
 	end
+end
+
+function take_out_item_and_place_it_next_to_player(item)
+	local entity = remove_entity_from_inventory(item)
+	if not entity then
+		entity = deserialize_entity(item.serialized_poly)
+		EntityKill(item.container_entity_id)
+	end
+	place_entity_in_front_of_player(entity)
+	wait(0)
+	item_storage_changed = true
 end
 
 function get_first_free_wand_slot()
@@ -863,9 +921,14 @@ function OnWorldPreUpdate()
 			for i, wand in ipairs(held_wands) do
 				if wand then
 					taken_slots[wand.inventory_slot] = true
-					if GuiImageButton(gui, new_id(), origin_x + slot_margin + wand.inventory_slot * slot_width_total, origin_y + slot_margin, "", "data/ui_gfx/inventory/inventory_box.png") then
+					local left_clicked, right_clicked = GuiImageButton(gui, new_id(), origin_x + slot_margin + wand.inventory_slot * slot_width_total, origin_y + slot_margin, "", "data/ui_gfx/inventory/inventory_box.png")
+					if left_clicked then
 						async(function()
 							put_wand_in_storage(wand.entity_id, active_wand_tab)
+						end)
+					elseif right_clicked then
+						async(function()
+							take_out_wand_and_place_it_next_to_player(wand.entity_id)
 						end)
 					end
 					local _, _, hovered, x, y, width, height = GuiGetPreviousWidgetInfo(gui)
@@ -891,9 +954,14 @@ function OnWorldPreUpdate()
 				for ix=0, (4-1) do
 					local wand = stored_wands[(iy*4 + ix) + 1]
 					if wand then
-						if GuiImageButton(gui, new_id(), origin_x + slot_margin + ix * slot_width_total, origin_y + spacer + slot_margin + slot_height_total + iy * slot_height_total, "", "data/ui_gfx/inventory/inventory_box.png") then
+						local left_clicked, right_clicked = GuiImageButton(gui, new_id(), origin_x + slot_margin + ix * slot_width_total, origin_y + spacer + slot_margin + slot_height_total + iy * slot_height_total, "", "data/ui_gfx/inventory/inventory_box.png")
+						if left_clicked then
 							async(function()
 								retrieve_or_swap_wand(wand, active_wand_tab)
+							end)
+						elseif right_clicked then
+							async(function()
+								take_out_wand_and_place_it_next_to_player(wand)
 							end)
 						end
 						local _, _, hovered, x, y, width, height = GuiGetPreviousWidgetInfo(gui)
@@ -944,9 +1012,14 @@ function OnWorldPreUpdate()
 			for i, item in ipairs(held_items) do
 				if item then
 					taken_slots[item.inventory_slot] = true
-					if GuiImageButton(gui, new_id(), origin_x + slot_margin + item.inventory_slot * slot_width_total, origin_y + slot_margin, "", "data/ui_gfx/inventory/inventory_box.png") then
+					local left_clicked, right_clicked = GuiImageButton(gui, new_id(), origin_x + slot_margin + item.inventory_slot * slot_width_total, origin_y + slot_margin, "", "data/ui_gfx/inventory/inventory_box.png")
+					if left_clicked then
 						async(function()
 							put_item_in_storage(item.entity_id, active_item_tab)
+						end)
+					elseif right_clicked then
+						async(function()
+							take_out_item_and_place_it_next_to_player(item.entity_id)
 						end)
 					end
 					local _, _, hovered, x, y, width, height = GuiGetPreviousWidgetInfo(gui)
@@ -980,9 +1053,14 @@ function OnWorldPreUpdate()
 				for ix=0, (4-1) do
 					local item = stored_items[(iy*4 + ix) + 1]
 					if item then
-						if GuiImageButton(gui, new_id(), origin_x + slot_margin + ix * slot_width_total, origin_y + spacer + slot_margin + slot_height_total + iy * slot_height_total, "", "data/ui_gfx/inventory/inventory_box.png") then
+						local left_clicked, right_clicked = GuiImageButton(gui, new_id(), origin_x + slot_margin + ix * slot_width_total, origin_y + spacer + slot_margin + slot_height_total + iy * slot_height_total, "", "data/ui_gfx/inventory/inventory_box.png")
+						if left_clicked then
 							async(function()
 								retrieve_or_swap_item(item, active_item_tab)
+							end)
+						elseif right_clicked then
+							async(function()
+								take_out_item_and_place_it_next_to_player(item)
 							end)
 						end
 						local _, _, hovered, x, y, width, height = GuiGetPreviousWidgetInfo(gui)

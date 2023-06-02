@@ -1,4 +1,5 @@
-UNRELEASED:
+v0.6.0:
+- Add ability to immediately drop items from bags on the floor by right clicking
 - Fix savefile getting flooded with more and more newlines after every game reload.
 
 v0.5.9:
