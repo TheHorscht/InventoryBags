@@ -579,9 +579,16 @@ function retrieve_or_swap_wand(wand, tab_number)
 	end
 end
 
+local function uninventorify_entity(entity_id)
+	EntitySetComponentsWithTagEnabled(entity_id, "enabled_in_hand", false)
+	EntitySetComponentsWithTagEnabled(entity_id, "enabled_in_inventory", false)
+	EntitySetComponentsWithTagEnabled(entity_id, "enabled_in_world", true)
+	EntityRemoveFromParent(entity_id)
+end
+
 local function remove_entity_from_inventory(entity_id)
 	if type(entity_id) ~= "number" then return end
-	EntityRemoveFromParent(entity_id)
+	uninventorify_entity(entity_id)
 	local player = EntityGetWithTag("player_unit")[1]
 	if player then
 		local inv2 = EntityGetFirstComponentIncludingDisabled(player, "Inventory2Component")
@@ -601,14 +608,11 @@ local function place_entity_in_front_of_player(entity_id)
 	local player = EntityGetWithTag("player_unit")[1]
 	local target_x, target_y = GameGetCameraPos()
 	if player then
-		local x, y = EntityGetTransform(player)
-		target_x = x
+		local x, y, rot, scale_x = EntityGetTransform(player)
+		target_x = x + 10 * scale_x
 		target_y = y - 5
 	end
 	EntityApplyTransform(entity_id, target_x, target_y)
-	EntitySetComponentsWithTagEnabled(entity_id, "enabled_in_hand", false)
-	EntitySetComponentsWithTagEnabled(entity_id, "enabled_in_inventory", false)
-	EntitySetComponentsWithTagEnabled(entity_id, "enabled_in_world", true)
 end
 
 function take_out_wand_and_place_it_next_to_player(wand)
@@ -661,6 +665,7 @@ function take_out_item_and_place_it_next_to_player(item)
 	local entity = remove_entity_from_inventory(item)
 	if not entity then
 		entity = deserialize_entity(item.serialized_poly)
+		uninventorify_entity(entity)
 		EntityKill(item.container_entity_id)
 	end
 	place_entity_in_front_of_player(entity)
