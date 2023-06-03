@@ -447,9 +447,11 @@ function get_inventory_and_active_item()
 			active_item = current_active_item
 		end
 		local item_component = EntityGetFirstComponentIncludingDisabled(entity_id, "ItemComponent")
-		local inventory_slot_x = ComponentGetValue2(item_component, "inventory_slot")
-		local non_wand_offset = not is_wand(entity_id) and 4 or 0
-		inv_out[inventory_slot_x+1 + non_wand_offset] = entity_id
+		if item_component then
+			local inventory_slot_x = ComponentGetValue2(item_component, "inventory_slot")
+			local non_wand_offset = not is_wand(entity_id) and 4 or 0
+			inv_out[inventory_slot_x+1 + non_wand_offset] = entity_id
+		end
 	end
 	return inv_out, active_item
 end
