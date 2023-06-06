@@ -1,3 +1,6 @@
+v0.6.2:
+- Fix wands not being interactable/visible when dropped while stored in a bag
+
 v0.6.1:
 - Fix crashes when taking out items with a GameEffect like brimstone etc
 - Place items slightly in front of player when taking out items

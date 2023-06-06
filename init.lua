@@ -619,6 +619,7 @@ function take_out_wand_and_place_it_next_to_player(wand)
 	local entity = remove_entity_from_inventory(wand)
 	if not entity then
 		entity = deserialize_entity(wand.serialized_poly)
+		uninventorify_entity(entity)
 		EntityKill(wand.container_entity_id)
 	end
 	place_entity_in_front_of_player(entity)
