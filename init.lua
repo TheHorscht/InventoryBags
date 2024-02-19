@@ -480,13 +480,16 @@ function create_and_pick_up_wand(serialized, slot)
 
 	-- Scroll to new wand to select it
 	local inventory_slots, active_item = get_inventory_and_active_item()
-	local active_item_item_comp = EntityGetFirstComponentIncludingDisabled(active_item, "ItemComponent")
-	local currently_selected_slot = ComponentGetValue2(active_item_item_comp, "inventory_slot")
-	if not active_item then
-		currently_selected_slot = 0
-	elseif not is_wand(active_item) then
-		-- Potions/Items start at 0, so add 4 to get the absolute position of the item in the inventory
-		currently_selected_slot = currently_selected_slot + 4
+	local currently_selected_slot = 0
+	if active_item then
+		local active_item_item_comp = EntityGetFirstComponentIncludingDisabled(active_item, "ItemComponent")
+		if active_item_item_comp then
+			currently_selected_slot = ComponentGetValue2(active_item_item_comp, "inventory_slot")
+		end
+		if not is_wand(active_item) then
+			-- Potions/Items start at 0, so add 4 to get the absolute position of the item in the inventory
+			currently_selected_slot = currently_selected_slot + 4
+		end
 	end
 	local change_amount = 0
 	for i=currently_selected_slot, currently_selected_slot+8 do
@@ -523,13 +526,16 @@ function create_and_pick_up_item(serialized, slot)
 
 	-- Scroll to new item to select it
 	local inventory_slots, active_item = get_inventory_and_active_item()
-	local active_item_item_comp = EntityGetFirstComponentIncludingDisabled(active_item, "ItemComponent")
-	local currently_selected_slot = ComponentGetValue2(active_item_item_comp, "inventory_slot")
-	if not active_item then
-		currently_selected_slot = 0
-	elseif not is_wand(active_item) then
-		-- Potions/Items start at 0, so add 4 to get the absolute position of the item in the inventory
-		currently_selected_slot = currently_selected_slot + 4
+	local currently_selected_slot = 0
+	if active_item then
+		local active_item_item_comp = EntityGetFirstComponentIncludingDisabled(active_item, "ItemComponent")
+		if active_item_item_comp then
+			currently_selected_slot = ComponentGetValue2(active_item_item_comp, "inventory_slot")
+		end
+		if not is_wand(active_item) then
+			-- Potions/Items start at 0, so add 4 to get the absolute position of the item in the inventory
+			currently_selected_slot = currently_selected_slot + 4
+		end
 	end
 	local change_amount = 0
 	for i=currently_selected_slot, currently_selected_slot+8 do
