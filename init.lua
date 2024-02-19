@@ -521,6 +521,9 @@ function create_and_pick_up_item(serialized, slot)
 	GamePickUpInventoryItem(EntityGetWithTag("player_unit")[1], new_item, false)
 	set_inventory_position(new_item, new_slot)
 	local inventory = get_inventory()
+	if EntityGetParent(new_item) > 0 then
+		EntityRemoveFromParent(new_item)
+	end
 	EntityAddChild(inventory, new_item)
 	-- /"Pick up" item and place it in inventory
 
@@ -758,13 +761,13 @@ function OnPlayerSpawned(player)
 	local wand_storage = EntityGetWithName("wand_storage_container")
 	if wand_storage == 0 then
 		wand_storage = EntityCreateNew("wand_storage_container")
-		create_and_add_tab_storage_entities(wand_storage, num_tabs)
+		create_and_add_tab_storage_entities(wand_storage, 5)
 		EntityAddChild(player, wand_storage)
 		GlobalsSetValue("InventoryBags_active_storage_version", storage_version)
 	else
 		if tonumber(GlobalsGetValue("InventoryBags_active_storage_version", "0")) ~= storage_version then
 			local old_wands = EntityGetAllChildren(wand_storage)
-			local first_tab_storage_entity = create_and_add_tab_storage_entities(wand_storage, num_tabs)
+			local first_tab_storage_entity = create_and_add_tab_storage_entities(wand_storage, 5)
 			-- Child entities are serialized wands
 			for i, entity_id in ipairs(old_wands or {}) do
 				EntityRemoveFromParent(entity_id)
@@ -775,13 +778,13 @@ function OnPlayerSpawned(player)
 	local item_storage = EntityGetWithName("item_storage_container")
 	if item_storage == 0 then
 		item_storage = EntityCreateNew("item_storage_container")
-		create_and_add_tab_storage_entities(item_storage, num_tabs)
+		create_and_add_tab_storage_entities(item_storage, 5)
 		EntityAddChild(player, item_storage)
 	else
 		if tonumber(GlobalsGetValue("InventoryBags_active_storage_version", "0")) ~= storage_version then
 			GlobalsSetValue("InventoryBags_active_storage_version", storage_version)
 			local old_items = EntityGetAllChildren(item_storage)
-			local first_tab_storage_entity = create_and_add_tab_storage_entities(item_storage, num_tabs)
+			local first_tab_storage_entity = create_and_add_tab_storage_entities(item_storage, 5)
 			-- Child entities are serialized items
 			for i, entity_id in ipairs(old_items or {}) do
 				EntityRemoveFromParent(entity_id)
@@ -806,7 +809,8 @@ button_pos_y = ModSettingGet("InventoryBags.pos_y")
 button_locked = ModSettingGet("InventoryBags.locked")
 show_wand_bag = ModSettingGet("InventoryBags.show_wand_bag")
 show_item_bag = ModSettingGet("InventoryBags.show_item_bag")
-
+show_tabs = ModSettingGet("InventoryBags.show_tabs")
+num_tabs = tonumber(ModSettingGet("InventoryBags.num_tabs")) or 5
 local tab_labels = {
 	wands = {},
 	items = {},
@@ -821,6 +825,9 @@ end
 
 load_label_settings()
 
+local bags_wand_capacity = ModSettingGet("InventoryBags.wands_per_tab")
+local bags_item_capacity = ModSettingGet("InventoryBags.items_per_tab")
+
 -- OnModSettingsChanged() seems to not work
 function OnPausedChanged(is_paused, is_inventory_pause)
 	if not button_locked and is_paused then
@@ -833,12 +840,27 @@ function OnPausedChanged(is_paused, is_inventory_pause)
 	button_locked = ModSettingGet("InventoryBags.locked")
 	show_wand_bag = ModSettingGet("InventoryBags.show_wand_bag")
 	show_item_bag = ModSettingGet("InventoryBags.show_item_bag")
+	num_tabs = tonumber(ModSettingGet("InventoryBags.num_tabs")) or 5
+	bags_wand_capacity = ModSettingGet("InventoryBags.wands_per_tab")
+	bags_item_capacity = ModSettingGet("InventoryBags.items_per_tab")
+	max_wand_rows = math.ceil(bags_wand_capacity / 4)
+	max_item_rows = math.ceil(bags_item_capacity / 4)
 	load_label_settings()
 end
 
 local active_wand_tab = 1
 local active_item_tab = 1
 local was_polymorphed = false
+
+function wand_bag_has_space()
+	local wands = get_stored_wands(active_wand_tab)
+	return #wands < bags_wand_capacity
+end
+
+function item_bag_has_space()
+	local items = get_stored_items(active_item_tab)
+	return #items < bags_item_capacity
+end
 
 function OnWorldPreUpdate()
 	-- This is for making async functions work
@@ -936,7 +958,7 @@ function OnWorldPreUpdate()
 				if wand then
 					taken_slots[wand.inventory_slot] = true
 					local left_clicked, right_clicked = GuiImageButton(gui, new_id(), origin_x + slot_margin + wand.inventory_slot * slot_width_total, origin_y + slot_margin, "", "data/ui_gfx/inventory/inventory_box.png")
-					if left_clicked then
+					if left_clicked and wand_bag_has_space() then
 						async(function()
 							put_wand_in_storage(wand.entity_id, active_wand_tab)
 						end)
@@ -966,6 +988,7 @@ function OnWorldPreUpdate()
 			end
 			for iy=0, (rows_wands-1) do
 				for ix=0, (4-1) do
+					local idx = (iy*4 + ix) + 1
 					local wand = stored_wands[(iy*4 + ix) + 1]
 					if wand then
 						local left_clicked, right_clicked = GuiImageButton(gui, new_id(), origin_x + slot_margin + ix * slot_width_total, origin_y + spacer + slot_margin + slot_height_total + iy * slot_height_total, "", "data/ui_gfx/inventory/inventory_box.png")
@@ -987,6 +1010,9 @@ function OnWorldPreUpdate()
 						GuiZSetForNextWidget(gui, -10)
 						GuiImage(gui, new_id(), x + (width / 2 - (w * scale) / 2), y + (height / 2 - (h *scale) / 2), wand.sprite_image_file, 1, scale, scale, 0, GUI_RECT_ANIMATION_PLAYBACK.Loop)
 					else
+						if idx > bags_wand_capacity then
+							GuiColorSetForNextWidget(gui, 0.8, 0.8, 0.8, 1)
+						end
 						GuiImage(gui, new_id(), origin_x + slot_margin + ix * slot_width_total, origin_y + spacer + slot_margin + slot_height_total + iy * slot_height_total, "data/ui_gfx/inventory/inventory_box.png", 1, 1, 1)
 					end
 				end
@@ -1027,7 +1053,7 @@ function OnWorldPreUpdate()
 				if item then
 					taken_slots[item.inventory_slot] = true
 					local left_clicked, right_clicked = GuiImageButton(gui, new_id(), origin_x + slot_margin + item.inventory_slot * slot_width_total, origin_y + slot_margin, "", "data/ui_gfx/inventory/inventory_box.png")
-					if left_clicked then
+					if left_clicked and item_bag_has_space() then
 						async(function()
 							put_item_in_storage(item.entity_id, active_item_tab)
 						end)
@@ -1065,6 +1091,7 @@ function OnWorldPreUpdate()
 			end
 			for iy=0, (rows_items-1) do
 				for ix=0, (4-1) do
+					local idx = (iy*4 + ix) + 1
 					local item = stored_items[(iy*4 + ix) + 1]
 					if item then
 						local left_clicked, right_clicked = GuiImageButton(gui, new_id(), origin_x + slot_margin + ix * slot_width_total, origin_y + spacer + slot_margin + slot_height_total + iy * slot_height_total, "", "data/ui_gfx/inventory/inventory_box.png")
@@ -1093,6 +1120,9 @@ function OnWorldPreUpdate()
 						end
 						GuiImage(gui, new_id(), x + (width / 2 - (w * scale) / 2), y + (height / 2 - (h *scale) / 2), item.image_file, 1, scale, scale, 0, GUI_RECT_ANIMATION_PLAYBACK.Loop)
 					else
+						if idx > bags_item_capacity then
+							GuiColorSetForNextWidget(gui, 0.8, 0.8, 0.8, 1)
+						end
 						GuiImage(gui, new_id(), origin_x + slot_margin + ix * slot_width_total, origin_y + spacer + slot_margin + slot_height_total + iy * slot_height_total, "data/ui_gfx/inventory/inventory_box.png", 1, 1, 1)
 					end
 				end

@@ -2,6 +2,21 @@ dofile("data/scripts/lib/mod_settings.lua")
 
 local mod_id = "InventoryBags"
 mod_settings_version = 1
+
+local function num_slots_input(mod_id, gui, in_main_menu, im_id, setting)
+	local old_value = tostring(ModSettingGetNextValue(mod_setting_get_id(mod_id, setting)) or setting.value_default)
+	GuiLayoutBeginHorizontal(gui, 0, 0)
+	GuiText(gui, 0, 0, setting.ui_name .. ": ")
+	local new_value = tonumber(GuiTextInput(gui, im_id, 0, 0, old_value, 50, 4, "0123456789")) or 0
+	local clicked, right_clicked, hovered, x, y, width, height, draw_x, draw_y, draw_width, draw_height = GuiGetPreviousWidgetInfo(gui)
+	if right_clicked then
+		new_value = setting.value_default
+	end
+	GuiLayoutEnd(gui)
+	ModSettingSetNextValue(mod_setting_get_id(mod_id, setting), new_value, false)
+	mod_setting_handle_change_callback(mod_id, gui, in_main_menu, setting, old_value, new_value)
+end
+
 mod_settings =
 {
 	{
@@ -47,6 +62,41 @@ mod_settings =
 		id = "show_item_bag",
 		ui_name = "Show item bag",
 		value_default = true,
+		scope = MOD_SETTING_SCOPE_RUNTIME,
+	},
+	{
+		id = "num_tabs",
+		ui_name = "Amount of tabs",
+		value_default = 5,
+		value_min = 0,
+		value_max = 5,
+		ui_fn = function(mod_id, gui, in_main_menu, im_id, setting)
+			local old_value = tonumber(ModSettingGetNextValue(mod_setting_get_id(mod_id, setting))) or setting.value_default
+			local new_value = GuiSlider(gui, im_id, 0, 0, setting.ui_name .. ": ", old_value, setting.value_min, setting.value_max, setting.value_default, 1, " ", 50)
+			new_value = math.floor(new_value + 0.5)
+			local clicked, right_clicked, hovered, x, y, width, height, draw_x, draw_y, draw_width, draw_height = GuiGetPreviousWidgetInfo(gui)
+			GuiOptionsAddForNextWidget(gui, GUI_OPTION.Layout_NoLayouting)
+			GuiText(gui, x + width + 5, y - 1, tostring(new_value))
+			if right_clicked then
+				new_value = setting.value_default
+			end
+			ModSettingSetNextValue(mod_setting_get_id(mod_id, setting), new_value, false)
+			mod_setting_handle_change_callback(mod_id, gui, in_main_menu, setting, old_value, new_value)
+		end,
+		scope = MOD_SETTING_SCOPE_RUNTIME,
+	},
+	{
+		id = "wands_per_tab",
+		ui_name = "Max wands per tab",
+		value_default = 9999,
+		ui_fn = num_slots_input,
+		scope = MOD_SETTING_SCOPE_RUNTIME,
+	},
+	{
+		id = "items_per_tab",
+		ui_name = "Max items per tab",
+		value_default = 9999,
+		ui_fn = num_slots_input,
 		scope = MOD_SETTING_SCOPE_RUNTIME,
 	},
 	{

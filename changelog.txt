@@ -1,3 +1,6 @@
+v0.7.0:
+- Add mod setting for setting the amount of tabs and capacity of each tab
+
 v0.6.2:
 - Fix wands not being interactable/visible when dropped while stored in a bag
 
