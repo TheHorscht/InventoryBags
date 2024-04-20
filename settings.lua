@@ -1,7 +1,7 @@
 dofile("data/scripts/lib/mod_settings.lua")
 
 local mod_id = "InventoryBags"
-mod_settings_version = 1
+mod_settings_version = 2
 
 local function num_slots_input(mod_id, gui, in_main_menu, im_id, setting)
 	local old_value = tostring(ModSettingGetNextValue(mod_setting_get_id(mod_id, setting)) or setting.value_default)
@@ -13,6 +13,20 @@ local function num_slots_input(mod_id, gui, in_main_menu, im_id, setting)
 		new_value = setting.value_default
 	end
 	GuiLayoutEnd(gui)
+	ModSettingSetNextValue(mod_setting_get_id(mod_id, setting), new_value, false)
+	mod_setting_handle_change_callback(mod_id, gui, in_main_menu, setting, old_value, new_value)
+end
+
+local function num_tabs_ui_fn(mod_id, gui, in_main_menu, im_id, setting)
+	local old_value = tonumber(ModSettingGetNextValue(mod_setting_get_id(mod_id, setting))) or setting.value_default
+	local new_value = GuiSlider(gui, im_id, 0, 0, setting.ui_name .. ": ", old_value, setting.value_min, setting.value_max, setting.value_default, 1, " ", 50)
+	new_value = math.floor(new_value + 0.5)
+	local clicked, right_clicked, hovered, x, y, width, height, draw_x, draw_y, draw_width, draw_height = GuiGetPreviousWidgetInfo(gui)
+	GuiOptionsAddForNextWidget(gui, GUI_OPTION.Layout_NoLayouting)
+	GuiText(gui, x + width + 5, y - 1, tostring(new_value))
+	if right_clicked then
+		new_value = setting.value_default
+	end
 	ModSettingSetNextValue(mod_setting_get_id(mod_id, setting), new_value, false)
 	mod_setting_handle_change_callback(mod_id, gui, in_main_menu, setting, old_value, new_value)
 end
@@ -65,24 +79,21 @@ mod_settings =
 		scope = MOD_SETTING_SCOPE_RUNTIME,
 	},
 	{
-		id = "num_tabs",
-		ui_name = "Amount of tabs",
+		id = "num_tabs_wands",
+		ui_name = "Amount of wand tabs",
 		value_default = 5,
 		value_min = 0,
 		value_max = 5,
-		ui_fn = function(mod_id, gui, in_main_menu, im_id, setting)
-			local old_value = tonumber(ModSettingGetNextValue(mod_setting_get_id(mod_id, setting))) or setting.value_default
-			local new_value = GuiSlider(gui, im_id, 0, 0, setting.ui_name .. ": ", old_value, setting.value_min, setting.value_max, setting.value_default, 1, " ", 50)
-			new_value = math.floor(new_value + 0.5)
-			local clicked, right_clicked, hovered, x, y, width, height, draw_x, draw_y, draw_width, draw_height = GuiGetPreviousWidgetInfo(gui)
-			GuiOptionsAddForNextWidget(gui, GUI_OPTION.Layout_NoLayouting)
-			GuiText(gui, x + width + 5, y - 1, tostring(new_value))
-			if right_clicked then
-				new_value = setting.value_default
-			end
-			ModSettingSetNextValue(mod_setting_get_id(mod_id, setting), new_value, false)
-			mod_setting_handle_change_callback(mod_id, gui, in_main_menu, setting, old_value, new_value)
-		end,
+		ui_fn = num_tabs_ui_fn,
+		scope = MOD_SETTING_SCOPE_RUNTIME,
+	},
+	{
+		id = "num_tabs_items",
+		ui_name = "Amount of item tabs",
+		value_default = 5,
+		value_min = 0,
+		value_max = 5,
+		ui_fn = num_tabs_ui_fn,
 		scope = MOD_SETTING_SCOPE_RUNTIME,
 	},
 	{
@@ -194,22 +205,14 @@ function adjust_setting_values(screen_width, screen_height)
 	end
 end
 
-local function MigrateWandBagSettingsToInventoryBags()
-	ModSettingRemove("WandBag._version")
-	for i, setting in ipairs(mod_settings) do
-		if not setting.not_setting then
-			local setting_id = mod_setting_get_id("WandBag",  setting.id)
-			local old_value = ModSettingGet(setting_id)
-			ModSettingRemove(setting_id)
-			ModSettingSetNextValue(mod_setting_get_id(mod_id, setting.id), old_value, true)
-		end
-	end
-end
-
 function ModSettingsUpdate(init_scope)
 	local old_version = mod_settings_get_version(mod_id)
-	if ModSettingGet("WandBag._version") == 1 then
-		MigrateWandBagSettingsToInventoryBags()
+	if old_version == 1 then
+		local old_num_tabs = ModSettingGet("InventoryBags.num_tabs") or 5
+		ModSettingSet("InventoryBags.num_tabs_wands", old_num_tabs)
+		ModSettingSetNextValue("InventoryBags.num_tabs_wands", old_num_tabs, true)
+		ModSettingSet("InventoryBags.num_tabs_items", old_num_tabs)
+		ModSettingSetNextValue("InventoryBags.num_tabs_items", old_num_tabs, true)
 	end
 	mod_settings_update(mod_id, mod_settings, init_scope)
 end

@@ -1,3 +1,6 @@
+v0.8.0:
+- Split the 'Amount of tabs' mod setting into individual settings for wands and items
+
 v0.7.0:
 - Add mod setting for setting the amount of tabs and capacity of each tab
 

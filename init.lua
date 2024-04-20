@@ -17,7 +17,8 @@ end
 local poly_place_x = 6666666
 local poly_place_y = 6666666
 
-local num_tabs = 5
+local num_tabs_wands = 5
+local num_tabs_items = 5
 local storage_version = 1
 local wand_storage_changed = true
 local item_storage_changed = true
@@ -810,14 +811,15 @@ button_locked = ModSettingGet("InventoryBags.locked")
 show_wand_bag = ModSettingGet("InventoryBags.show_wand_bag")
 show_item_bag = ModSettingGet("InventoryBags.show_item_bag")
 show_tabs = ModSettingGet("InventoryBags.show_tabs")
-num_tabs = tonumber(ModSettingGet("InventoryBags.num_tabs")) or 5
+num_tabs_wands = tonumber(ModSettingGet("InventoryBags.num_tabs_wands")) or 5
+num_tabs_items = tonumber(ModSettingGet("InventoryBags.num_tabs_items")) or 5
 local tab_labels = {
 	wands = {},
 	items = {},
 }
 
 function load_label_settings()
-	for i=1, num_tabs do
+	for i=1, 5 do
 		tab_labels.wands[i] = ModSettingGet("InventoryBags.tab_label_wands_" .. i) or ""
 		tab_labels.items[i] = ModSettingGet("InventoryBags.tab_label_items_" .. i) or ""
 	end
@@ -840,7 +842,8 @@ function OnPausedChanged(is_paused, is_inventory_pause)
 	button_locked = ModSettingGet("InventoryBags.locked")
 	show_wand_bag = ModSettingGet("InventoryBags.show_wand_bag")
 	show_item_bag = ModSettingGet("InventoryBags.show_item_bag")
-	num_tabs = tonumber(ModSettingGet("InventoryBags.num_tabs")) or 5
+	num_tabs_wands = tonumber(ModSettingGet("InventoryBags.num_tabs_wands")) or 5
+	num_tabs_items = tonumber(ModSettingGet("InventoryBags.num_tabs_items")) or 5
 	bags_wand_capacity = ModSettingGet("InventoryBags.wands_per_tab")
 	bags_item_capacity = ModSettingGet("InventoryBags.items_per_tab")
 	max_wand_rows = math.ceil(bags_wand_capacity / 4)
@@ -935,7 +938,7 @@ function OnWorldPreUpdate()
 				GuiImage(gui, new_id(), origin_x - 4, origin_y - 4 + offset_y, "mods/InventoryBags/files/invisible_80x10.png", 1, 1, 1)
 			end
 			-- Render tabs
-			for i=1, num_tabs do
+			for i=1, num_tabs_wands do
 				local add_text_offset = 0
 				if i == 1 then
 					add_text_offset = 1
@@ -1030,7 +1033,7 @@ function OnWorldPreUpdate()
 				GuiImage(gui, new_id(), origin_x - 4, origin_y - 4 + offset_y, "mods/InventoryBags/files/invisible_80x10.png", 1, 1, 1)
 			end
 			-- Render tabs
-			for i=1, num_tabs do
+			for i=1, num_tabs_items do
 				local add_text_offset = 0
 				if i == 1 then
 					add_text_offset = 1
