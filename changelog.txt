@@ -1,3 +1,6 @@
+UNRELEASED:
+- Add quick store and quick swap keyboard shortcuts (requires M-Néé mod)
+
 v0.8.0:
 - Split the 'Amount of tabs' mod setting into individual settings for wands and items
 

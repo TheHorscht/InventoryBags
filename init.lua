@@ -1,6 +1,3 @@
--- TODO: Add something like filters
--- For instance 4 buttons at the top, labeled [1][2][3][4] and you can set tooltip names for it in the mod settings
-
 dofile_once("data/scripts/lib/utilities.lua")
 dofile_once("data/scripts/gun/gun_enums.lua")
 dofile_once("mods/InventoryBags/lib/coroutines.lua")
@@ -9,9 +6,16 @@ local polytools = dofile_once("mods/InventoryBags/lib/polytools/polytools.lua")
 local nxml = dofile_once("mods/InventoryBags/lib/nxml.lua")
 local EZWand = dofile_once("mods/InventoryBags/lib/EZWand/EZWand.lua")
 
+local function _get_binding_pressed(mod_name, binding_name)
+	return false
+end
+
 if ModIsEnabled("mnee") then
 	ModLuaFileAppend("mods/mnee/bindings.lua", "mods/InventoryBags/mnee.lua")
 	dofile_once("mods/mnee/lib.lua")
+	function _get_binding_pressed(binding_name)
+		return get_binding_pressed("InvBags", binding_name)
+	end
 end
 
 local poly_place_x = 6666666
@@ -22,6 +26,9 @@ local num_tabs_items = 5
 local storage_version = 1
 local wand_storage_changed = true
 local item_storage_changed = true
+local last_stored_entity = {}
+local cached_stored_wands
+local entity_killed_this_frame
 
 local function split_string(inputstr, sep)
   sep = sep or "%s"
@@ -58,6 +65,9 @@ end
 
 function is_wand(entity)
 	local ability_component = EntityGetFirstComponentIncludingDisabled(entity, "AbilityComponent")
+	if not ability_component then
+		return false
+	end
 	return ComponentGetValue2(ability_component, "use_gun_script") == true
 end
 
@@ -141,29 +151,29 @@ function get_stored_wands(tab_number)
 		local out = {}
 		if wand_storage > 0 then
 			local tab_entity = get_tab_entity(wand_storage, tab_number)
-			local serialized_wands = EntityGetAllChildren(tab_entity) or {}
-			for i, container_entity_id in ipairs(serialized_wands) do
-				local serialized_ez, serialized_poly
-				for i, comp in ipairs(EntityGetComponentIncludingDisabled(container_entity_id, "VariableStorageComponent") or {}) do
-					if ComponentGetValue2(comp, "name") == "serialized_ez" then
-						serialized_ez = ComponentGetValue2(comp, "value_string")
+			for i, container_entity_id in ipairs(EntityGetAllChildren(tab_entity) or {}) do
+				if entity_killed_this_frame ~= container_entity_id then
+					local serialized_ez, serialized_poly
+					for i, comp in ipairs(EntityGetComponentIncludingDisabled(container_entity_id, "VariableStorageComponent") or {}) do
+						if ComponentGetValue2(comp, "name") == "serialized_ez" then
+							serialized_ez = ComponentGetValue2(comp, "value_string")
+						end
+						if ComponentGetValue2(comp, "name") == "serialized_poly" then
+							serialized_poly = ComponentGetValue2(comp, "value_string")
+						end
 					end
-					if ComponentGetValue2(comp, "name") == "serialized_poly" then
-						serialized_poly = ComponentGetValue2(comp, "value_string")
+					local wand = EZWand.Deserialize(serialized_ez)
+					if ends_with(wand.sprite_image_file, ".xml") then
+						wand.sprite_image_file = get_xml_sprite(wand.sprite_image_file)
 					end
+					wand.container_entity_id = container_entity_id
+					wand.serialized_poly = serialized_poly
+					table.insert(out, wand)
 				end
-				local wand = EZWand.Deserialize(serialized_ez)
-				if ends_with(wand.sprite_image_file, ".xml") then
-					wand.sprite_image_file = get_xml_sprite(wand.sprite_image_file)
-				end
-				wand.container_entity_id = container_entity_id
-				wand.serialized_poly = serialized_poly
-				serialized_wands[i] = wand
 			end
-			table.sort(serialized_wands, function (a, b)
+			table.sort(out, function (a, b)
 				return a.container_entity_id < b.container_entity_id
 			end)
-			out = serialized_wands
 		end
 		wand_storage_changed = false
 		cached_stored_wands = out
@@ -180,35 +190,35 @@ function get_stored_items(tab_number)
 		local out = {}
 		if item_storage > 0 then
 			local tab_entity = get_tab_entity(item_storage, tab_number)
-			local serialized_items = EntityGetAllChildren(tab_entity) or {}
-			for i, container_entity_id in ipairs(serialized_items) do
-				local image_file, potion_color, tooltip, serialized_poly
-				for i, comp in ipairs(EntityGetComponentIncludingDisabled(container_entity_id, "VariableStorageComponent")) do
-					if ComponentGetValue2(comp, "name") == "serialized_image_file" then
-						image_file = ComponentGetValue2(comp, "value_string")
+			for i, container_entity_id in ipairs(EntityGetAllChildren(tab_entity) or {}) do
+				if entity_killed_this_frame ~= container_entity_id then
+					local image_file, potion_color, tooltip, serialized_poly
+					for i, comp in ipairs(EntityGetComponentIncludingDisabled(container_entity_id, "VariableStorageComponent")) do
+						if ComponentGetValue2(comp, "name") == "serialized_image_file" then
+							image_file = ComponentGetValue2(comp, "value_string")
+						end
+						if ComponentGetValue2(comp, "name") == "serialized_potion_color" then
+							potion_color = ComponentGetValue2(comp, "value_int")
+						end
+						if ComponentGetValue2(comp, "name") == "serialized_tooltip" then
+							tooltip = ComponentGetValue2(comp, "value_string"):gsub("<NEWLINE>", "\n")
+						end
+						if ComponentGetValue2(comp, "name") == "serialized_poly" then
+							serialized_poly = ComponentGetValue2(comp, "value_string")
+						end
 					end
-					if ComponentGetValue2(comp, "name") == "serialized_potion_color" then
-						potion_color = ComponentGetValue2(comp, "value_int")
-					end
-					if ComponentGetValue2(comp, "name") == "serialized_tooltip" then
-						tooltip = ComponentGetValue2(comp, "value_string"):gsub("<NEWLINE>", "\n")
-					end
-					if ComponentGetValue2(comp, "name") == "serialized_poly" then
-						serialized_poly = ComponentGetValue2(comp, "value_string")
-					end
+					local item = {}
+					item.container_entity_id = container_entity_id
+					item.serialized_poly = serialized_poly
+					item.image_file = image_file
+					item.potion_color = potion_color
+					item.tooltip = tooltip
+					table.insert(out, item)
 				end
-				local item = {}
-				item.container_entity_id = container_entity_id
-				item.serialized_poly = serialized_poly
-				item.image_file = image_file
-				item.potion_color = potion_color
-				item.tooltip = tooltip
-				serialized_items[i] = item
 			end
-			table.sort(serialized_items, function (a, b)
+			table.sort(out, function (a, b)
 				return a.container_entity_id < b.container_entity_id
 			end)
-			out = serialized_items
 		end
 		item_storage_changed = false
 		cached_stored_items = out
@@ -232,13 +242,18 @@ function serialize_entity(entity)
 	if not coroutine.running() then
 		error("serialize_entity() must be called from inside an async function", 2)
 	end
-	EntityRemoveFromParent(entity)
 	-- Need to do this because we poly the entity and thus lose the reference to it,
 	-- because the polymorphed entity AND the one that it turns back into both have different entity_ids than the original
 	-- That's why we first move it to some location where it will hopefully be the only entity, so we can later get it back
 	-- But this also means that this location will be saved in the serialized string, and when it gets deserialized,
 	-- will spawn there again (Test this later to confirm!!! Too lazy right now)
+	EntityRemoveFromParent(entity)
 	EntityApplyTransform(entity, poly_place_x, poly_place_y)
+	-- Some spells like BOMB are missing InheritTransformComponent
+	-- manually move the card actions to target location to hide the sprite flashes
+	for i, v in ipairs(EntityGetAllChildren(entity) or {}) do
+		EntityApplyTransform(v, poly_place_x, poly_place_y)
+	end
 	local serialized = polytools.save(entity)
 	wait(0)
 	-- Kill the wand AND call cards IF for some unknown reason they are also detected with EntityGetInRadius
@@ -271,7 +286,7 @@ function get_tab_entity(storage_entity, tab_number)
 end
 
 function create_storage_entity(ez, poly)
-	local entity = EntityCreateNew()
+	local entity = EntityCreateNew("InventoryBags_stored_wand")
 	EntityAddComponent2(entity, "VariableStorageComponent", {
 		name = "serialized_ez",
 		value_string = ez
@@ -284,7 +299,7 @@ function create_storage_entity(ez, poly)
 end
 
 function create_item_storage_entity(image_file, potion_color, tooltip, poly)
-	local entity = EntityCreateNew()
+	local entity = EntityCreateNew("InventoryBags_stored_item")
 	EntityAddComponent2(entity, "VariableStorageComponent", {
 		name = "serialized_image_file",
 		value_string = image_file
@@ -317,6 +332,11 @@ function put_wand_in_storage(wand, tab_number)
 		local poly = serialize_entity(wand)
 		local new_entry = create_storage_entity(ez, poly)
 		local tab_entity = get_tab_entity(wand_storage, tab_number)
+		last_stored_entity = {
+			container_entity_id = new_entry,
+			serialized_poly = poly,
+			tab_number = tab_number
+		}
 		EntityAddChild(tab_entity, new_entry)
 		wand_storage_changed = true
 	end
@@ -403,6 +423,11 @@ function put_item_in_storage(item, tab_number)
 		local poly = serialize_entity(item)
 		local new_entry = create_item_storage_entity(image_file, potion_color ,tooltip, poly)
 		local tab_entity = get_tab_entity(item_storage, tab_number)
+		last_stored_entity = {
+			container_entity_id = new_entry,
+			serialized_poly = poly,
+			tab_number = tab_number
+		}
 		EntityAddChild(tab_entity, new_entry)
 		item_storage_changed = true
 	end
@@ -427,6 +452,11 @@ function scroll_inventory(amount)
 		wait(0)
 		ComponentSetValue2(controls_comp, "enabled", true)
 	end)
+	local inventory_2_comp = EntityGetFirstComponentIncludingDisabled(player, "Inventory2Component")
+	if inventory_2_comp then
+		-- This will only skip 1 equip message, but it's better than nothing
+		ComponentSetValue2(inventory_2_comp, "mDontLogNextItemEquip", true)
+	end
 	-- This allows us to simulate inventory scrolling
 	-- Thanks to Lobzyr on the Noita discord for figuring this out
 	ComponentSetValue2(controls_comp, "mButtonDownChangeItemR", true)
@@ -457,29 +487,43 @@ function get_inventory_and_active_item()
 	return inv_out, active_item
 end
 
-function create_and_pick_up_wand(serialized, slot)
-	if not coroutine.running() then
-		error("create_and_pick_up_wand() must be called from inside an async function", 2)
+function pick_up_wand_and_place_in_inventory(wand, slot)
+	local item_comp = EntityGetFirstComponentIncludingDisabled(wand, "ItemComponent")
+	if item_comp then
+		ComponentSetValue2(item_comp, "is_pickable", true)
+		ComponentSetValue2(item_comp, "play_pick_sound", false)
+		ComponentSetValue2(item_comp, "next_frame_pickable", 0)
+		ComponentSetValue2(item_comp, "npc_next_frame_pickable", 0)
 	end
-	local new_wand = deserialize_entity(serialized)
-	-- "Pick up" wand and place it in inventory
-	local item_comp = EntityGetFirstComponentIncludingDisabled(new_wand, "ItemComponent")
-	ComponentSetValue2(item_comp, "is_pickable", true)
-	ComponentSetValue2(item_comp, "play_pick_sound", false)
-	ComponentSetValue2(item_comp, "next_frame_pickable", 0)
-	ComponentSetValue2(item_comp, "npc_next_frame_pickable", 0)
 	local first_free_wand_slot = get_first_free_wand_slot()
 	local new_slot = slot and slot or first_free_wand_slot
-	GamePickUpInventoryItem(EntityGetWithTag("player_unit")[1], new_wand, false)
-	set_inventory_position(new_wand, new_slot)
+	set_inventory_position(wand, new_slot)
 	local inventory = get_inventory()
-	-- For some reason this is neccessary because even though new_wand doesn't have a parent
+	-- For some reason this is neccessary because even though wand doesn't have a parent
 	-- and EntityGetParent even returns 0, it still complains that "Error: child already has a parent!"
-	EntityRemoveFromParent(new_wand)
-	EntityAddChild(inventory, new_wand)
-	-- /"Pick up" wand and place it in inventory
+	EntityRemoveFromParent(wand)
+	EntityAddChild(inventory, wand)
+end
 
-	-- Scroll to new wand to select it
+function pick_up_item_and_place_in_inventory(item, slot)
+	local item_comp = EntityGetFirstComponentIncludingDisabled(item, "ItemComponent")
+	if item_comp then
+		ComponentSetValue2(item_comp, "is_pickable", true)
+		ComponentSetValue2(item_comp, "play_pick_sound", false)
+		ComponentSetValue2(item_comp, "next_frame_pickable", 0)
+		ComponentSetValue2(item_comp, "npc_next_frame_pickable", 0)
+	end
+	local first_free_item_slot = get_first_free_item_slot()
+	local new_slot = slot and slot or first_free_item_slot
+	set_inventory_position(item, new_slot)
+	local inventory = get_inventory()
+	-- For some reason this is neccessary because even though item doesn't have a parent
+	-- and EntityGetParent even returns 0, it still complains that "Error: child already has a parent!"
+	EntityRemoveFromParent(item)
+	EntityAddChild(inventory, item)
+end
+
+function scroll_inventory_to_slot(new_slot)
 	local inventory_slots, active_item = get_inventory_and_active_item()
 	local currently_selected_slot = 0
 	if active_item then
@@ -506,7 +550,14 @@ function create_and_pick_up_wand(serialized, slot)
 		change_amount = change_amount + 1
 	end
 	scroll_inventory(change_amount)
-	-- /Scroll to new wand to select it
+end
+
+function create_and_pick_up_wand(serialized, slot)
+	if not coroutine.running() then
+		error("create_and_pick_up_wand() must be called from inside an async function", 2)
+	end
+	pick_up_wand_and_place_in_inventory(deserialize_entity(serialized), slot) -- wait(0)
+	scroll_inventory_to_slot(slot)
 end
 
 function create_and_pick_up_item(serialized, slot)
@@ -732,17 +783,13 @@ local spell_type_bgs = {
 	[ACTION_TYPE_PASSIVE] = "data/ui_gfx/inventory/item_bg_passive.png",
 }
 
-local function get_spell_bg(action_id)
-	return spell_type_bgs[spell_lookup[action_id] and spell_lookup[action_id].type] or spell_type_bgs[ACTION_TYPE_OTHER]
-end
-
 function OnPlayerSpawned(player)
 	GlobalsSetValue("InventoryBags_is_open", "0")
 	if not spell_lookup then
 		spell_lookup = {}
 		dofile_once("data/scripts/gun/gun_actions.lua")
 		for i, action in ipairs(actions) do
-			spell_lookup[action.id] = { 
+			spell_lookup[action.id] = {
 				icon = action.sprite,
 				type = action.type
 			}
@@ -805,8 +852,8 @@ function is_inventory_open()
 	end
 end
 
-button_pos_x = ModSettingGet("InventoryBags.pos_x")
-button_pos_y = ModSettingGet("InventoryBags.pos_y")
+button_pos_x = ModSettingGet("InventoryBags.pos_x") or 2
+button_pos_y = ModSettingGet("InventoryBags.pos_y") or 22
 button_locked = ModSettingGet("InventoryBags.locked")
 show_wand_bag = ModSettingGet("InventoryBags.show_wand_bag")
 show_item_bag = ModSettingGet("InventoryBags.show_item_bag")
@@ -836,8 +883,8 @@ function OnPausedChanged(is_paused, is_inventory_pause)
 		ModSettingSetNextValue("InventoryBags.pos_x", button_pos_x, false)
 		ModSettingSetNextValue("InventoryBags.pos_y", button_pos_y, false)
 	else
-		button_pos_x = ModSettingGet("InventoryBags.pos_x")
-		button_pos_y = ModSettingGet("InventoryBags.pos_y")
+		button_pos_x = ModSettingGet("InventoryBags.pos_x") or 2
+		button_pos_y = ModSettingGet("InventoryBags.pos_y") or 22
 	end
 	button_locked = ModSettingGet("InventoryBags.locked")
 	show_wand_bag = ModSettingGet("InventoryBags.show_wand_bag")
@@ -863,6 +910,55 @@ end
 function item_bag_has_space()
 	local items = get_stored_items(active_item_tab)
 	return #items < bags_item_capacity
+end
+
+function quick_store()
+	local active_item = get_active_item() or -1
+	if EntityGetIsAlive(active_item) then
+		if is_wand(active_item) then
+			if wand_bag_has_space() then
+				async(function()
+					put_wand_in_storage(active_item, active_wand_tab)
+					scroll_inventory(1)
+				end)
+			end
+		else
+			if item_bag_has_space() then
+				async(function()
+					put_item_in_storage(active_item, active_item_tab)
+					scroll_inventory(1)
+				end)
+			end
+		end
+	end
+end
+
+function swap_with_last_stored_item()
+	local name = EntityGetName(last_stored_entity.container_entity_id)
+	local active_item = get_active_item()
+	local inventory_slot = get_inventory_position(active_item)
+	local temp = last_stored_entity
+	async(function()
+		if name == "InventoryBags_stored_wand" and is_wand(active_item) then
+			put_wand_in_storage(active_item, last_stored_entity.tab_number)
+			local first_free_wand_slot = get_first_free_wand_slot()
+			local serialized, slot = temp.serialized_poly, inventory_slot or first_free_wand_slot
+			pick_up_wand_and_place_in_inventory(deserialize_entity(serialized), slot) -- wait(0)
+			scroll_inventory_to_slot(slot)
+			EntityKill(temp.container_entity_id)
+			entity_killed_this_frame = temp.container_entity_id
+			wand_storage_changed = true
+		elseif name == "InventoryBags_stored_item" and is_item(active_item) then
+			put_item_in_storage(active_item, last_stored_entity.tab_number)
+			local first_free_item_slot = get_first_free_item_slot()
+			local serialized, slot = temp.serialized_poly, inventory_slot or first_free_item_slot
+			pick_up_item_and_place_in_inventory(deserialize_entity(serialized), slot) -- wait(0)
+			scroll_inventory_to_slot(slot)
+			EntityKill(temp.container_entity_id)
+			entity_killed_this_frame = temp.container_entity_id
+			item_storage_changed = true
+		end
+	end)
 end
 
 function OnWorldPreUpdate()
@@ -905,9 +1001,15 @@ function OnWorldPreUpdate()
 			button_pos_y = draw_y - draw_height / 2
 		end
 	end
+	if _get_binding_pressed("quick_store") then
+		quick_store()
+	end
+	if _get_binding_pressed("swap_with_last_stored_item") then
+		swap_with_last_stored_item()
+	end
 	-- Toggle it open/closed
 	if not inventory_open and (GuiImageButton(gui, new_id(), button_pos_x, button_pos_y, "", "mods/InventoryBags/files/gui_button.png")
-		or ModIsEnabled("mnee") and get_binding_pressed("InvBags", "toggle")) then
+		or _get_binding_pressed("toggle")) then
 		open = not open
 		GlobalsSetValue("InventoryBags_is_open", open and 1 or 0)
 	end
