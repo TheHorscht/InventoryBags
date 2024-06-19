@@ -60,6 +60,13 @@ mod_settings =
 		not_setting = true,
 	},
 	{
+		id = "sounds_enabled",
+		ui_name = "Enable sounds",
+		ui_description = "Whether sounds should be played for opening/closing the bag or dropping items.",
+		value_default = true,
+		scope = MOD_SETTING_SCOPE_RUNTIME,
+	},
+	{
 		id = "locked",
 		ui_name = "Lock button",
 		ui_description = "When unlocked, button can be dragged to a new position",

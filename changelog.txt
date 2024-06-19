@@ -1,5 +1,6 @@
 UNRELEASED:
 - Add quick store and quick swap keyboard shortcuts (requires M-Néé mod)
+- Add sounds for opening/closing the bag and dropping items, can be disabled in mod settings
 
 v0.8.0:
 - Split the 'Amount of tabs' mod setting into individual settings for wands and items

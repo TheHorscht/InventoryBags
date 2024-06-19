@@ -684,6 +684,10 @@ function take_out_wand_and_place_it_next_to_player(wand)
 		EntityKill(wand.container_entity_id)
 	end
 	place_entity_in_front_of_player(entity)
+	if sounds_enabled then
+		local cx, cy = GameGetCameraPos()
+		GamePlaySound("data/audio/Desktop/ui.bank", "ui/item_remove", cx, cy)
+	end
 	local vel_comp = EntityGetFirstComponentIncludingDisabled(entity, "VelocityComponent")
 	if vel_comp then
 		ComponentSetValue2(vel_comp, "mVelocity", 0, -100)
@@ -729,6 +733,10 @@ function take_out_item_and_place_it_next_to_player(item)
 		entity = deserialize_entity(item.serialized_poly)
 		uninventorify_entity(entity)
 		EntityKill(item.container_entity_id)
+	end
+	if sounds_enabled then
+		local cx, cy = GameGetCameraPos()
+		GamePlaySound("data/audio/Desktop/ui.bank", "ui/item_remove", cx, cy)
 	end
 	place_entity_in_front_of_player(entity)
 	wait(0)
@@ -852,6 +860,7 @@ function is_inventory_open()
 	end
 end
 
+sounds_enabled = ModSettingGet("InventoryBags.sounds_enabled") or false
 button_pos_x = ModSettingGet("InventoryBags.pos_x") or 2
 button_pos_y = ModSettingGet("InventoryBags.pos_y") or 22
 button_locked = ModSettingGet("InventoryBags.locked")
@@ -886,6 +895,7 @@ function OnPausedChanged(is_paused, is_inventory_pause)
 		button_pos_x = ModSettingGet("InventoryBags.pos_x") or 2
 		button_pos_y = ModSettingGet("InventoryBags.pos_y") or 22
 	end
+	sounds_enabled = ModSettingGet("InventoryBags.sounds_enabled") or false
 	button_locked = ModSettingGet("InventoryBags.locked")
 	show_wand_bag = ModSettingGet("InventoryBags.show_wand_bag")
 	show_item_bag = ModSettingGet("InventoryBags.show_item_bag")
@@ -1011,6 +1021,10 @@ function OnWorldPreUpdate()
 	if not inventory_open and (GuiImageButton(gui, new_id(), button_pos_x, button_pos_y, "", "mods/InventoryBags/files/gui_button.png")
 		or _get_binding_pressed("toggle")) then
 		open = not open
+		if sounds_enabled then
+			local px, py = EntityGetFirstHitboxCenter(player)
+			GamePlaySound("data/audio/Desktop/ui.bank", "ui/inventory_" .. (open and "open" or "close"), px, py)
+		end
 		GlobalsSetValue("InventoryBags_is_open", open and 1 or 0)
 	end
 
