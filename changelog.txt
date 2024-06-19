@@ -1,4 +1,5 @@
-UNRELEASED:
+v0.9.0:
+- Add ability to sort wands by stats
 - Add quick store and quick swap keyboard shortcuts (requires M-Néé mod)
 - Add sounds for opening/closing the bag and dropping items, can be disabled in mod settings
 

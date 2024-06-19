@@ -30,6 +30,66 @@ local last_stored_entity = {}
 local cached_stored_wands
 local entity_killed_this_frame
 
+local function get_serialized_ez(entity_id)
+	for i, comp in ipairs(EntityGetComponentIncludingDisabled(entity_id, "VariableStorageComponent") or {}) do
+		if ComponentGetValue2(comp, "name") == "serialized_ez" then
+			return ComponentGetValue2(comp, "value_string")
+		end
+	end
+end
+
+local sorting_directions = { ASCENDING = 1, DESCENDING = 2 }
+local sorting_functions = {
+	{ "data/ui_gfx/inventory/icon_gun_shuffle.png", function (a, b)
+		return (a.props.shuffle and 1 or 0) - (b.props.shuffle and 1 or 0)
+	end, "Shuffle" },
+	{ "data/ui_gfx/inventory/icon_gun_actions_per_round.png", function (a, b)
+		return a.props.spellsPerCast - b.props.spellsPerCast
+	end, "Spells/Cast" },
+	{ "data/ui_gfx/inventory/icon_fire_rate_wait.png", function (a, b)
+		return a.props.castDelay - b.props.castDelay
+	end, "Cast Delay" },
+	{ "data/ui_gfx/inventory/icon_gun_reload_time.png", function (a, b)
+		return a.props.rechargeTime - b.props.rechargeTime
+	end, "Recharge Time" },
+	{ "data/ui_gfx/inventory/icon_mana_max.png", function (a, b)
+		return a.props.manaMax - b.props.manaMax
+	end, "Mana Max" },
+	{ "data/ui_gfx/inventory/icon_mana_charge_speed.png", function (a, b)
+		return a.props.manaChargeSpeed - b.props.manaChargeSpeed
+	end, "Mana Charge Speed" },
+	{ "data/ui_gfx/inventory/icon_gun_capacity.png", function (a, b)
+		return a.props.capacity - b.props.capacity
+	end, "Capacity" },
+	{ "data/ui_gfx/inventory/icon_spread_degrees.png", function (a, b)
+		return a.props.spread - b.props.spread
+	end, "Spread" },
+}
+
+local default_sorting_function = function(a, b)
+	return a.container_entity_id < b.container_entity_id
+end
+local function sort_wand(sorting_function, a, b, sorting_direction)
+	local ez_a = EZWand.Deserialize(get_serialized_ez(a.container_entity_id))
+	local ez_b = EZWand.Deserialize(get_serialized_ez(b.container_entity_id))
+	ez_a.container_entity_id = a.container_entity_id
+	ez_b.container_entity_id = b.container_entity_id
+	local result
+	if sorting_direction == sorting_directions.ASCENDING then
+		result = sorting_function(a, b)
+	else
+		result = sorting_function(b, a)
+	end
+	if result < 0 then return true end
+	if result > 0 then return false end
+	if sorting_direction == sorting_directions.ASCENDING then
+		return default_sorting_function(a, b)
+	else
+		return default_sorting_function(b, a)
+	end
+end
+
+
 local function split_string(inputstr, sep)
   sep = sep or "%s"
   local t= {}
@@ -171,9 +231,7 @@ function get_stored_wands(tab_number)
 					table.insert(out, wand)
 				end
 			end
-			table.sort(out, function (a, b)
-				return a.container_entity_id < b.container_entity_id
-			end)
+			table.sort(out, default_sorting_function)
 		end
 		wand_storage_changed = false
 		cached_stored_wands = out
@@ -780,17 +838,6 @@ function get_xml_sprite(sprite_xml_path)
 	return xml.attr.filename
 end
 
-local spell_type_bgs = {
-	[ACTION_TYPE_PROJECTILE] = "data/ui_gfx/inventory/item_bg_projectile.png",
-	[ACTION_TYPE_STATIC_PROJECTILE] = "data/ui_gfx/inventory/item_bg_static_projectile.png",
-	[ACTION_TYPE_MODIFIER] = "data/ui_gfx/inventory/item_bg_modifier.png",
-	[ACTION_TYPE_DRAW_MANY] = "data/ui_gfx/inventory/item_bg_draw_many.png",
-	[ACTION_TYPE_MATERIAL] = "data/ui_gfx/inventory/item_bg_material.png",
-	[ACTION_TYPE_OTHER] = "data/ui_gfx/inventory/item_bg_other.png",
-	[ACTION_TYPE_UTILITY] = "data/ui_gfx/inventory/item_bg_utility.png",
-	[ACTION_TYPE_PASSIVE] = "data/ui_gfx/inventory/item_bg_passive.png",
-}
-
 function OnPlayerSpawned(player)
 	GlobalsSetValue("InventoryBags_is_open", "0")
 	if not spell_lookup then
@@ -944,11 +991,16 @@ function quick_store()
 end
 
 function swap_with_last_stored_item()
-	local name = EntityGetName(last_stored_entity.container_entity_id)
-	local active_item = get_active_item()
-	local inventory_slot = get_inventory_position(active_item)
-	local temp = last_stored_entity
 	async(function()
+		while swap_in_progress do
+			wait(1)
+		end
+		swap_in_progress = true
+		local name = EntityGetName(last_stored_entity.container_entity_id)
+		local temp = last_stored_entity
+		local active_item = get_active_item()
+		if not active_item then return end
+		local inventory_slot = get_inventory_position(active_item)
 		if name == "InventoryBags_stored_wand" and is_wand(active_item) then
 			put_wand_in_storage(active_item, last_stored_entity.tab_number)
 			local first_free_wand_slot = get_first_free_wand_slot()
@@ -968,6 +1020,7 @@ function swap_with_last_stored_item()
 			entity_killed_this_frame = temp.container_entity_id
 			item_storage_changed = true
 		end
+		swap_in_progress = false
 	end)
 end
 
@@ -998,6 +1051,9 @@ function OnWorldPreUpdate()
 		GuiOptionsAdd(gui, GUI_OPTION.NonInteractive)
 	end
 	GuiOptionsAdd(gui, GUI_OPTION.NoPositionTween)
+  -- Allow speed clicking
+  GuiOptionsAdd(gui, GUI_OPTION.HandleDoubleClickAsClick)
+  GuiOptionsAdd(gui, GUI_OPTION.ClickCancelsDoubleClick)
 
 	local inventory_open = is_inventory_open()
 	-- If button dragging is enabled in the settings and the inventory is not open, make it draggable
@@ -1134,6 +1190,36 @@ function OnWorldPreUpdate()
 						end
 						GuiImage(gui, new_id(), origin_x + slot_margin + ix * slot_width_total, origin_y + spacer + slot_margin + slot_height_total + iy * slot_height_total, "data/ui_gfx/inventory/inventory_box.png", 1, 1, 1)
 					end
+				end
+			end
+			-- Render sort icons
+			local icon_w, icon_h = 14, 14
+			local icons_per_row = 4
+			local xxx = box_width - icon_w * icons_per_row
+			GuiZSetForNextWidget(gui, 21)
+			GuiImageNinePiece(gui, new_id(), origin_x + xxx - 8, origin_y + box_height_wands, icon_w * icons_per_row, icon_h * 2 + 4, 1, "mods/InventoryBags/files/container_9piece.png", "mods/InventoryBags/files/container_9piece.png")
+			-- Render click blocking images
+			for i=1, 3 do
+				GuiZSetForNextWidget(gui, -99999)
+				GuiImage(gui, new_id(), origin_x - 4, origin_y + box_height_wands + (i-1) * 10, "mods/InventoryBags/files/invisible_80x10.png", 1, 1, 1)
+			end
+			for i, v in ipairs(sorting_functions) do
+				local offset_x = (i-1) * icon_w-- + 4
+				local offset_y = math.floor((i - 1) / icons_per_row) * icon_h -- + 8
+				offset_x = offset_x % (icon_w * icons_per_row)
+				local x = origin_x + offset_x + xxx / 2 + 4
+				local y = origin_y + box_height_wands + offset_y + 8
+				local left_clicked, right_clicked = GuiImageButton(gui, new_id(), x, y, "", v[1])
+				GuiTooltip(gui, ("Sort wands by %s"):format(v[3]), "Left click = Sort ascending\nRight click = Sort descending")
+				if left_clicked or right_clicked then
+					-- wand_storage_changed = true
+					if sounds_enabled then
+						local cx, cy = GameGetCameraPos()
+						GamePlaySound("data/audio/Desktop/ui.bank", "ui/item_move_success", cx, cy)
+					end
+					table.sort(cached_stored_wands, function(a, b)
+						return sort_wand(v[2], a, b, left_clicked and sorting_directions.ASCENDING or sorting_directions.DESCENDING)
+					end)
 				end
 			end
 		end
