@@ -731,6 +731,9 @@ local function place_entity_in_front_of_player(entity_id)
 		target_x = x + 10 * scale_x
 		target_y = y - 5
 	end
+	for i, child in ipairs(EntityGetAllChildren(entity_id) or {}) do
+		EntityApplyTransform(child, target_x, target_y)
+	end
 	EntityApplyTransform(entity_id, target_x, target_y)
 end
 
