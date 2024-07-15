@@ -155,7 +155,14 @@ function get_held_wands()
 		local wands = {}
 		for i, wand in ipairs(EntityGetAllChildren(inventory) or {}) do
 			if is_wand(wand) then
+				local baggable = true
 				local sprite_component = EntityGetFirstComponentIncludingDisabled(wand, "SpriteComponent")
+				for i, comp in ipairs(EntityGetComponentIncludingDisabled(wand, "VariableStorageComponent") or {}) do
+					if ComponentGetValue2(comp, "name") == "InventoryBags_not_baggable" then
+						baggable = false
+						break
+					end
+				end
 				local image_file = ComponentGetValue2(sprite_component, "image_file")
 				if ends_with(image_file, ".xml") then
 					image_file = get_xml_sprite(image_file)
@@ -164,7 +171,8 @@ function get_held_wands()
 					entity_id = wand,
 					image_file = image_file,
 					inventory_slot = get_inventory_position(wand),
-					active = wand == active_item
+					active = wand == active_item,
+					baggable = baggable
 				})
 			end
 		end
@@ -181,7 +189,14 @@ function get_held_items()
 		local items = {}
 		for i, item in ipairs(EntityGetAllChildren(inventory) or {}) do
 			if is_item(item) then
+				local baggable = true
 				local item_component = EntityGetFirstComponentIncludingDisabled(item, "ItemComponent")
+				for i, comp in ipairs(EntityGetComponentIncludingDisabled(item, "VariableStorageComponent") or {}) do
+					if ComponentGetValue2(comp, "name") == "InventoryBags_not_baggable" then
+						baggable = false
+						break
+					end
+				end
 				if item_component then
 					local image_file = ComponentGetValue2(item_component, "ui_sprite")
 					if ends_with(image_file, ".xml") then
@@ -191,7 +206,8 @@ function get_held_items()
 						entity_id = item,
 						image_file = image_file,
 						inventory_slot = get_inventory_position(item) % 4,
-						active = item == active_item
+						active = item == active_item,
+						baggable = baggable
 					})
 				end
 			end
@@ -1136,7 +1152,7 @@ function OnWorldPreUpdate()
 				if wand then
 					taken_slots[wand.inventory_slot] = true
 					local left_clicked, right_clicked = GuiImageButton(gui, new_id(), origin_x + slot_margin + wand.inventory_slot * slot_width_total, origin_y + slot_margin, "", "data/ui_gfx/inventory/inventory_box.png")
-					if left_clicked and wand_bag_has_space() then
+					if left_clicked and wand.baggable and wand_bag_has_space() then
 						async(function()
 							put_wand_in_storage(wand.entity_id, active_wand_tab)
 						end)
@@ -1261,7 +1277,7 @@ function OnWorldPreUpdate()
 				if item then
 					taken_slots[item.inventory_slot] = true
 					local left_clicked, right_clicked = GuiImageButton(gui, new_id(), origin_x + slot_margin + item.inventory_slot * slot_width_total, origin_y + slot_margin, "", "data/ui_gfx/inventory/inventory_box.png")
-					if left_clicked and item_bag_has_space() then
+					if left_clicked and item.baggable and item_bag_has_space() then
 						async(function()
 							put_item_in_storage(item.entity_id, active_item_tab)
 						end)
