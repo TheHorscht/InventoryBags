@@ -89,7 +89,6 @@ local function sort_wand(sorting_function, a, b, sorting_direction)
 	end
 end
 
-
 local function split_string(inputstr, sep)
   sep = sep or "%s"
   local t= {}
@@ -102,6 +101,14 @@ end
 local function ends_with(str, ending)
 	if not str then error("str is nil", 2) end
   return ending == "" or str:sub(-#ending) == ending
+end
+
+local function get_variable_storage_component(entity_id, var_store_name)
+	for i, comp in ipairs(EntityGetComponentIncludingDisabled(entity_id, "VariableStorageComponent") or {}) do
+		if ComponentGetValue2(comp, "name") == var_store_name then
+			return comp
+		end
+	end
 end
 
 function get_active_item()
@@ -155,14 +162,8 @@ function get_held_wands()
 		local wands = {}
 		for i, wand in ipairs(EntityGetAllChildren(inventory) or {}) do
 			if is_wand(wand) then
-				local baggable = true
+				local baggable = get_variable_storage_component(wand, "InventoryBags_not_baggable") == nil
 				local sprite_component = EntityGetFirstComponentIncludingDisabled(wand, "SpriteComponent")
-				for i, comp in ipairs(EntityGetComponentIncludingDisabled(wand, "VariableStorageComponent") or {}) do
-					if ComponentGetValue2(comp, "name") == "InventoryBags_not_baggable" then
-						baggable = false
-						break
-					end
-				end
 				local image_file = ComponentGetValue2(sprite_component, "image_file")
 				if ends_with(image_file, ".xml") then
 					image_file = get_xml_sprite(image_file)
@@ -189,14 +190,8 @@ function get_held_items()
 		local items = {}
 		for i, item in ipairs(EntityGetAllChildren(inventory) or {}) do
 			if is_item(item) then
-				local baggable = true
+				local baggable = get_variable_storage_component(item, "InventoryBags_not_baggable") == nil
 				local item_component = EntityGetFirstComponentIncludingDisabled(item, "ItemComponent")
-				for i, comp in ipairs(EntityGetComponentIncludingDisabled(item, "VariableStorageComponent") or {}) do
-					if ComponentGetValue2(comp, "name") == "InventoryBags_not_baggable" then
-						baggable = false
-						break
-					end
-				end
 				if item_component then
 					local image_file = ComponentGetValue2(item_component, "ui_sprite")
 					if ends_with(image_file, ".xml") then
@@ -1152,10 +1147,16 @@ function OnWorldPreUpdate()
 				if wand then
 					taken_slots[wand.inventory_slot] = true
 					local left_clicked, right_clicked = GuiImageButton(gui, new_id(), origin_x + slot_margin + wand.inventory_slot * slot_width_total, origin_y + slot_margin, "", "data/ui_gfx/inventory/inventory_box.png")
-					if left_clicked and wand.baggable and wand_bag_has_space() then
-						async(function()
-							put_wand_in_storage(wand.entity_id, active_wand_tab)
-						end)
+					if left_clicked and wand_bag_has_space() then
+						if wand.baggable then
+							async(function()
+								put_wand_in_storage(wand.entity_id, active_wand_tab)
+							end)
+						else
+							local var_store = get_variable_storage_component(wand.entity_id, "InventoryBags_not_baggable")
+							-- To indicate that an attempt was made to put this into the bag, for other mods to read out if they want
+							ComponentSetValue2(var_store, "value_bool", true)
+						end
 					elseif right_clicked then
 						async(function()
 							take_out_wand_and_place_it_next_to_player(wand.entity_id)
@@ -1277,10 +1278,16 @@ function OnWorldPreUpdate()
 				if item then
 					taken_slots[item.inventory_slot] = true
 					local left_clicked, right_clicked = GuiImageButton(gui, new_id(), origin_x + slot_margin + item.inventory_slot * slot_width_total, origin_y + slot_margin, "", "data/ui_gfx/inventory/inventory_box.png")
-					if left_clicked and item.baggable and item_bag_has_space() then
-						async(function()
-							put_item_in_storage(item.entity_id, active_item_tab)
-						end)
+					if left_clicked and item_bag_has_space() then
+						if item.baggable then
+							async(function()
+								put_item_in_storage(item.entity_id, active_item_tab)
+							end)
+						else
+							local var_store = get_variable_storage_component(item.entity_id, "InventoryBags_not_baggable")
+							-- To indicate that an attempt was made to put this into the bag, for other mods to read out if they want
+							ComponentSetValue2(var_store, "value_bool", true)
+						end
 					elseif right_clicked then
 						async(function()
 							take_out_item_and_place_it_next_to_player(item.entity_id)
