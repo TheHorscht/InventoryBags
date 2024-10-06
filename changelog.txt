@@ -1,3 +1,6 @@
+v0.9.3:
+- Fix tooltip z index
+
 v0.9.2:
 - Add feature for mods to check if an attempt was made to bag an unbaggable wand/item
 

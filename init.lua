@@ -1361,7 +1361,7 @@ function OnWorldPreUpdate()
 		end
 		-- Render a tooltip of the hovered wand if we have any
 		if tooltip_wand then
-			EZWand.RenderTooltip(origin_x + box_width + 30, origin_y + 5, tooltip_wand, gui)
+			EZWand.RenderTooltip(origin_x + box_width + 30, origin_y + 5, tooltip_wand, gui, -100)
 		end
 		-- Render a tooltip of the hovered item if we have any
 		if tooltip_item then
@@ -1371,11 +1371,12 @@ function OnWorldPreUpdate()
 			local lines = split_string(tooltip_item, "\n")
 			for i, line in ipairs(lines) do
 				local offset = line == " " and -7 or 0
+				GuiZSetForNextWidget(gui, -101)
 				GuiText(gui, 0, offset, line)
 			end
 			GuiLayoutEnd(gui)
 			GuiLayoutEnd(gui)
-			GuiZSetForNextWidget(gui, 10)
+			GuiZSetForNextWidget(gui, -100)
 			GuiEndAutoBoxNinePiece(gui)
 		end
 	end
