@@ -572,6 +572,9 @@ function pick_up_wand_and_place_in_inventory(wand, slot)
 	-- and EntityGetParent even returns 0, it still complains that "Error: child already has a parent!"
 	EntityRemoveFromParent(wand)
 	EntityAddChild(inventory, wand)
+	EntitySetComponentsWithTagEnabled(wand, "enabled_in_inventory", true)
+	EntitySetComponentsWithTagEnabled(wand, "enabled_in_hand", false)
+	EntitySetComponentsWithTagEnabled(wand, "enabled_in_world", false)
 end
 
 function pick_up_item_and_place_in_inventory(item, slot)
@@ -590,6 +593,9 @@ function pick_up_item_and_place_in_inventory(item, slot)
 	-- and EntityGetParent even returns 0, it still complains that "Error: child already has a parent!"
 	EntityRemoveFromParent(item)
 	EntityAddChild(inventory, item)
+	EntitySetComponentsWithTagEnabled(item, "enabled_in_inventory", true)
+	EntitySetComponentsWithTagEnabled(item, "enabled_in_hand", false)
+	EntitySetComponentsWithTagEnabled(item, "enabled_in_world", false)
 end
 
 function scroll_inventory_to_slot(new_slot)
@@ -622,11 +628,15 @@ function scroll_inventory_to_slot(new_slot)
 end
 
 function create_and_pick_up_wand(serialized, slot)
+	GamePrint("ehh=")
 	if not coroutine.running() then
 		error("create_and_pick_up_wand() must be called from inside an async function", 2)
 	end
 	pick_up_wand_and_place_in_inventory(deserialize_entity(serialized), slot) -- wait(0)
-	scroll_inventory_to_slot(slot)
+	if switch_to_item then
+		GamePrint("HELLO?=!?!?")
+		scroll_inventory_to_slot(slot)
+	end
 end
 
 function create_and_pick_up_item(serialized, slot)
@@ -637,6 +647,9 @@ function create_and_pick_up_item(serialized, slot)
 	ComponentSetValue2(item_comp, "play_pick_sound", false)
 	ComponentSetValue2(item_comp, "next_frame_pickable", 0)
 	ComponentSetValue2(item_comp, "npc_next_frame_pickable", 0)
+	EntitySetComponentsWithTagEnabled(new_item, "enabled_in_inventory", true)
+	EntitySetComponentsWithTagEnabled(new_item, "enabled_in_hand", false)
+	EntitySetComponentsWithTagEnabled(new_item, "enabled_in_world", false)
 	local first_free_item_slot = get_first_free_item_slot()
 	local new_slot = slot and slot or first_free_item_slot
 	GamePickUpInventoryItem(EntityGetWithTag("player_unit")[1], new_item, false)
@@ -674,7 +687,9 @@ function create_and_pick_up_item(serialized, slot)
 	if not active_item then
 		change_amount = change_amount + 1
 	end
-	scroll_inventory(change_amount)
+	if switch_to_item then
+		scroll_inventory(change_amount)
+	end
 	-- /Scroll to new item to select it
 end
 
@@ -922,6 +937,7 @@ function is_inventory_open()
 end
 
 sounds_enabled = ModSettingGet("InventoryBags.sounds_enabled") or false
+switch_to_item = ModSettingGet("InventoryBags.switch_to_item") or false
 button_pos_x = ModSettingGet("InventoryBags.pos_x") or 2
 button_pos_y = ModSettingGet("InventoryBags.pos_y") or 22
 button_locked = ModSettingGet("InventoryBags.locked")
@@ -957,6 +973,7 @@ function OnPausedChanged(is_paused, is_inventory_pause)
 		button_pos_y = ModSettingGet("InventoryBags.pos_y") or 22
 	end
 	sounds_enabled = ModSettingGet("InventoryBags.sounds_enabled") or false
+	switch_to_item = ModSettingGet("InventoryBags.switch_to_item") or false
 	button_locked = ModSettingGet("InventoryBags.locked")
 	show_wand_bag = ModSettingGet("InventoryBags.show_wand_bag")
 	show_item_bag = ModSettingGet("InventoryBags.show_item_bag")
@@ -1061,6 +1078,30 @@ function OnWorldPreUpdate()
 		return current_id
 	end
 	GuiStartFrame(gui)
+
+	if GuiButton(gui, new_id(), 0, 240, "test") then
+		async(function()
+			local cx, cy = GameGetCameraPos()
+			math.randomseed(cx + cy)
+			for i=1, 4 do
+				local x, y = math.random(), math.random()
+				local wand = EntityLoad("data/entities/items/wand_unshuffle_01.xml", x, y)
+				put_wand_in_storage(wand, 1)
+				wait(10)
+			end
+			for i=1, 100 do
+				local rnd = math.random()
+				local wands = get_stored_wands(1)
+				local wand = wands[math.random(4)]
+				if wand then
+					retrieve_or_swap_wand(wand, 1)
+					scroll_inventory_to_slot(math.random(4) - 1)
+					wait(30)
+				end
+			end
+		end)
+	end
+
 	if GameGetIsGamepadConnected() then
 		GuiOptionsAdd(gui, GUI_OPTION.NonInteractive)
 	end

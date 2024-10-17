@@ -67,6 +67,13 @@ mod_settings =
 		scope = MOD_SETTING_SCOPE_RUNTIME,
 	},
 	{
+		id = "switch_to_item",
+		ui_name = "Switch to wand/item",
+		ui_description = "Scroll to the wand/item right after taking it out of the inventory.",
+		value_default = true,
+		scope = MOD_SETTING_SCOPE_RUNTIME,
+	},
+	{
 		id = "locked",
 		ui_name = "Lock button",
 		ui_description = "When unlocked, button can be dragged to a new position",
