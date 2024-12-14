@@ -24,11 +24,14 @@ local poly_place_y = 6666666
 local num_tabs_wands = 5
 local num_tabs_items = 5
 local storage_version = 1
+local active_wand_tab = 1
+local active_item_tab = 1
 local wand_storage_changed = true
 local item_storage_changed = true
 local last_stored_entity = {}
 local cached_stored_wands
 local entity_killed_this_frame
+local was_polymorphed = false
 
 local function get_serialized_ez(entity_id)
 	for i, comp in ipairs(EntityGetComponentIncludingDisabled(entity_id, "VariableStorageComponent") or {}) do
@@ -854,6 +857,8 @@ end
 
 function OnPlayerSpawned(player)
 	GlobalsSetValue("InventoryBags_is_open", "0")
+	GlobalsSetValue("InventoryBags_active_wand_tab", tostring(active_wand_tab))
+	GlobalsSetValue("InventoryBags_active_item_tab", tostring(active_item_tab))
 	if not spell_lookup then
 		spell_lookup = {}
 		dofile_once("data/scripts/gun/gun_actions.lua")
@@ -968,10 +973,6 @@ function OnPausedChanged(is_paused, is_inventory_pause)
 	max_item_rows = math.ceil(bags_item_capacity / 4)
 	load_label_settings()
 end
-
-local active_wand_tab = 1
-local active_item_tab = 1
-local was_polymorphed = false
 
 function wand_bag_has_space()
 	local wands = get_stored_wands(active_wand_tab)
@@ -1133,6 +1134,7 @@ function OnWorldPreUpdate()
 				local is_active_wand_tab = function() return active_wand_tab == i end
 				if GuiImageButton(gui, new_id(), origin_x - 16, origin_y + 5 + (i-1) * 17, "", "mods/InventoryBags/files/tab_left_empty" .. (is_active_wand_tab() and "_active" or "") .. ".png") then
 					active_wand_tab = i
+					GlobalsSetValue("InventoryBags_active_wand_tab", tostring(active_wand_tab))
 					wand_storage_changed = true
 				end
 				if tab_labels.wands[i] ~= "" then
@@ -1264,6 +1266,7 @@ function OnWorldPreUpdate()
 				local is_active_item_tab = function() return active_item_tab == i end
 				if GuiImageButton(gui, new_id(), origin_x + 76, origin_y + 5 + (i-1) * 17, "", "mods/InventoryBags/files/tab_right_empty" .. (is_active_item_tab() and "_active" or "") .. ".png") then
 					active_item_tab = i
+					GlobalsSetValue("InventoryBags_active_item_tab", tostring(active_item_tab))
 					item_storage_changed = true
 				end
 				if tab_labels.items[i] ~= "" then
