@@ -1,3 +1,6 @@
+v0.9.5:
+- Fix spells not showing their sprite with Bombs Materialized perk
+
 v0.9.4:
 - Expose active_wand_tab and active_item_tab as GlobalsGetValue for modders
 

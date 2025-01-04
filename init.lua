@@ -106,6 +106,25 @@ local function ends_with(str, ending)
   return ending == "" or str:sub(-#ending) == ending
 end
 
+local function get_item_image(entity_id)
+	local image_file = "data/ui_gfx/gun_actions/unidentified.png"
+	local item_component = EntityGetFirstComponentIncludingDisabled(entity_id, "ItemComponent")
+	if item_component then
+		image_file = ComponentGetValue2(item_component, "ui_sprite")
+		if image_file == "" then
+			-- This is for spells when player has spells materialized perk
+			local sprite_component = EntityGetFirstComponentIncludingDisabled(entity_id, "SpriteComponent", "item_identified")
+			if sprite_component then
+				image_file = ComponentGetValue2(sprite_component, "image_file")
+			end
+		end
+		if ends_with(image_file, ".xml") then
+			image_file = get_xml_sprite(image_file)
+		end
+	end
+	return image_file
+end
+
 local function get_variable_storage_component(entity_id, var_store_name)
 	for i, comp in ipairs(EntityGetComponentIncludingDisabled(entity_id, "VariableStorageComponent") or {}) do
 		if ComponentGetValue2(comp, "name") == var_store_name then
@@ -196,13 +215,9 @@ function get_held_items()
 				local baggable = get_variable_storage_component(item, "InventoryBags_not_baggable") == nil
 				local item_component = EntityGetFirstComponentIncludingDisabled(item, "ItemComponent")
 				if item_component then
-					local image_file = ComponentGetValue2(item_component, "ui_sprite")
-					if ends_with(image_file, ".xml") then
-						image_file = get_xml_sprite(image_file)
-					end
 					table.insert(items, {
 						entity_id = item,
-						image_file = image_file,
+						image_file = get_item_image(item),
 						inventory_slot = get_inventory_position(item) % 4,
 						active = item == active_item,
 						baggable = baggable
@@ -465,7 +480,11 @@ function tooltipify_item(item)
 		local fill_percent = math.ceil((total_amount / barrel_size) * 100)
 		item_name = (GameTextGet(item_name, main_material) .. GameTextGet("$item_potion_fullness", fill_percent)):upper()
 	else
+		local uses_remaining = ComponentGetValue2(item_component, "uses_remaining")
 		item_name = GameTextGetTranslatedOrNot(item_name):upper()
+		if uses_remaining ~= -1 then
+			item_name = ("%s (%s)"):format(item_name, uses_remaining)
+		end
 	end
 
 	local potion_color = GameGetPotionColorUint(item)
@@ -474,10 +493,7 @@ function tooltipify_item(item)
 	if material_inventory_lines ~= "" then
 		tooltip = tooltip .. "\n \n" .. material_inventory_lines
 	end
-	local image_file = ComponentGetValue2(item_component, "ui_sprite")
-	if ends_with(image_file, ".xml") then
-		image_file = get_xml_sprite(image_file)
-	end
+	local image_file = get_item_image(item)
 	return image_file, potion_color, tooltip
 end
 
