@@ -324,8 +324,22 @@ function string_match_percent(ser1, ser2)
   return character_match_amount / longest_length
 end
 
+if ModIsEnabled("quant.ew") then
+	ModLuaFileAppend("mods/quant.ew/files/api/extra_modules.lua", "mods/InventoryBags/files/entangled_serialize.lua")
+end
+
+-- For EntangledWorlds https://github.com/IntQuant/noita_entangled_worlds
+function serialize_entity_ew(entity)
+	local serialized = CrossCall("InventoryBags_serialize_entity", entity)
+	EntityKill(entity)
+	return serialized
+end
+
 ---Needs to be called from inside an async function. Kills entity and returns the serialized string after 1 frame.
 function serialize_entity(entity)
+	if ModIsEnabled("quant.ew") then
+		return serialize_entity_ew(entity)
+	end
 	if not coroutine.running() then
 		error("serialize_entity() must be called from inside an async function", 2)
 	end
@@ -351,7 +365,16 @@ function serialize_entity(entity)
 	return serialized
 end
 
+-- For EntangledWorlds https://github.com/IntQuant/noita_entangled_worlds
+function deserialize_entity_ew(serialized)
+	return CrossCall("InventoryBags_deserialize_entity", serialized, poly_place_x, poly_place_y)
+end
+
+
 function deserialize_entity(str)
+	if ModIsEnabled("quant.ew") then
+		return deserialize_entity_ew(str)
+	end
 	if not coroutine.running() then
 		error("deserialize_entity() must be called from inside an async function", 2)
 	end
