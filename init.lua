@@ -974,6 +974,7 @@ show_item_bag = ModSettingGet("InventoryBags.show_item_bag")
 show_tabs = ModSettingGet("InventoryBags.show_tabs")
 num_tabs_wands = tonumber(ModSettingGet("InventoryBags.num_tabs_wands")) or 5
 num_tabs_items = tonumber(ModSettingGet("InventoryBags.num_tabs_items")) or 5
+local opening_inv_closes_bags = ModSettingGet("InventoryBags.opening_inv_closes_bags")
 local tab_labels = {
 	wands = {},
 	items = {},
@@ -1008,6 +1009,7 @@ function OnPausedChanged(is_paused, is_inventory_pause)
 	num_tabs_items = tonumber(ModSettingGet("InventoryBags.num_tabs_items")) or 5
 	bags_wand_capacity = ModSettingGet("InventoryBags.wands_per_tab")
 	bags_item_capacity = ModSettingGet("InventoryBags.items_per_tab")
+	opening_inv_closes_bags = ModSettingGet("InventoryBags.opening_inv_closes_bags")
 	max_wand_rows = math.ceil(bags_wand_capacity / 4)
 	max_item_rows = math.ceil(bags_item_capacity / 4)
 	load_label_settings()
@@ -1079,6 +1081,10 @@ function swap_with_last_stored_item()
 end
 
 function OnWorldPreUpdate()
+  if opening_inv_closes_bags and GameIsInventoryOpen() then
+    open = false
+		GlobalsSetValue("InventoryBags_is_open", "0")
+  end
 	-- This is for making async functions work
 	wake_up_waiting_threads(1)
 	-- Detect polymorph
