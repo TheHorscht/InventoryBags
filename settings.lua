@@ -124,6 +124,13 @@ mod_settings =
 		scope = MOD_SETTING_SCOPE_RUNTIME,
 	},
 	{
+		id = "auto_storage",
+		ui_name = "Auto storage",
+		ui_description = "Automatically place picked up wands/items directly into\nthe currently selected tab of their respective bag.",
+		value_default = false,
+		scope = MOD_SETTING_SCOPE_RUNTIME,
+	},
+	{
 		category_id = "tab_labels",
 		ui_name = "Tab Labels",
 		ui_description = "Labels for the tabs when hovering over them.\nKeep the mouse hovered over these text fields to enter text.",

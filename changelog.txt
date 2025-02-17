@@ -1,5 +1,6 @@
-UNRELEASED:
+v0.10.0:
 - Add setting for automatically closing bags when opening inventory
+- Add setting to automatically store picked up wands/items
 
 v0.9.6:
 - Add compatibility with entangled worlds (experimental)

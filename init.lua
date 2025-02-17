@@ -975,6 +975,7 @@ show_tabs = ModSettingGet("InventoryBags.show_tabs")
 num_tabs_wands = tonumber(ModSettingGet("InventoryBags.num_tabs_wands")) or 5
 num_tabs_items = tonumber(ModSettingGet("InventoryBags.num_tabs_items")) or 5
 local opening_inv_closes_bags = ModSettingGet("InventoryBags.opening_inv_closes_bags")
+local auto_storage = ModSettingGet("InventoryBags.auto_storage")
 local tab_labels = {
 	wands = {},
 	items = {},
@@ -1010,6 +1011,7 @@ function OnPausedChanged(is_paused, is_inventory_pause)
 	bags_wand_capacity = ModSettingGet("InventoryBags.wands_per_tab")
 	bags_item_capacity = ModSettingGet("InventoryBags.items_per_tab")
 	opening_inv_closes_bags = ModSettingGet("InventoryBags.opening_inv_closes_bags")
+	auto_storage = ModSettingGet("InventoryBags.auto_storage")
 	max_wand_rows = math.ceil(bags_wand_capacity / 4)
 	max_item_rows = math.ceil(bags_item_capacity / 4)
 	load_label_settings()
@@ -1085,6 +1087,28 @@ function OnWorldPreUpdate()
     open = false
 		GlobalsSetValue("InventoryBags_is_open", "0")
   end
+	if auto_storage then
+		if wand_bag_has_space() then
+			for i, wand in ipairs(get_held_wands()) do
+				local item_comp = EntityGetFirstComponentIncludingDisabled(wand.entity_id, "ItemComponent")
+				if item_comp and wand.baggable and ComponentGetValue2(item_comp, "mFramePickedUp") == GameGetFrameNum() then
+					async(function()
+						put_wand_in_storage(wand.entity_id, active_wand_tab)
+					end)
+				end
+			end
+		end
+		if item_bag_has_space() then
+			for i, item in ipairs(get_held_items()) do
+				local item_comp = EntityGetFirstComponentIncludingDisabled(item.entity_id, "ItemComponent")
+				if item_comp and item.baggable and ComponentGetValue2(item_comp, "mFramePickedUp") == GameGetFrameNum() then
+					async(function()
+						put_item_in_storage(item.entity_id, active_item_tab)
+					end)
+				end
+			end
+		end
+	end
 	-- This is for making async functions work
 	wake_up_waiting_threads(1)
 	-- Detect polymorph
