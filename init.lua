@@ -1,6 +1,7 @@
 dofile_once("data/scripts/lib/utilities.lua")
 dofile_once("data/scripts/gun/gun_enums.lua")
 dofile_once("mods/InventoryBags/lib/coroutines.lua")
+local utf8 = dofile_once("mods/InventoryBags/lib/utf8.lua")
 dofile_once("mods/InventoryBags/lib/polytools/polytools_init.lua").init("mods/InventoryBags/lib/polytools")
 local polytools = dofile_once("mods/InventoryBags/lib/polytools/polytools.lua")
 local nxml = dofile_once("mods/InventoryBags/lib/nxml.lua")
@@ -976,6 +977,14 @@ num_tabs_wands = tonumber(ModSettingGet("InventoryBags.num_tabs_wands")) or 5
 num_tabs_items = tonumber(ModSettingGet("InventoryBags.num_tabs_items")) or 5
 local opening_inv_closes_bags = ModSettingGet("InventoryBags.opening_inv_closes_bags")
 local auto_storage = ModSettingGet("InventoryBags.auto_storage")
+local auto_storage_blocklist_type = ModSettingGet("InventoryBags.list_type") or "blacklist"
+local auto_storage_num_blocklist_entries = ModSettingGet("InventoryBags.num_blocklist_entries") or 0
+local auto_storage_blocklist_entries = {}
+for i=1, auto_storage_num_blocklist_entries do
+	local entry = ModSettingGet("InventoryBags.blocklist_entries." .. tostring(i))
+  table.insert(auto_storage_blocklist_entries, entry)
+end
+
 local tab_labels = {
 	wands = {},
 	items = {},
@@ -1012,9 +1021,41 @@ function OnPausedChanged(is_paused, is_inventory_pause)
 	bags_item_capacity = ModSettingGet("InventoryBags.items_per_tab")
 	opening_inv_closes_bags = ModSettingGet("InventoryBags.opening_inv_closes_bags")
 	auto_storage = ModSettingGet("InventoryBags.auto_storage")
+
+	auto_storage_blocklist_type = ModSettingGet("InventoryBags.list_type") or "blacklist"
+	auto_storage_num_blocklist_entries = ModSettingGet("InventoryBags.num_blocklist_entries") or 0
+	auto_storage_blocklist_entries = {}
+	for i=1, auto_storage_num_blocklist_entries do
+		local entry = ModSettingGet("InventoryBags.blocklist_entries." .. tostring(i))
+	  table.insert(auto_storage_blocklist_entries, entry)
+	end
+
 	max_wand_rows = math.ceil(bags_wand_capacity / 4)
 	max_item_rows = math.ceil(bags_item_capacity / 4)
 	load_label_settings()
+end
+
+local function blocklist_check(item_comp)
+	local item_name = ComponentGetValue2(item_comp, "item_name")
+	if auto_storage_blocklist_type == "whitelist" then
+		for i=1, auto_storage_num_blocklist_entries do
+			local item_name = utf8.lower(GameTextGetTranslatedOrNot(item_name))
+			local name_found = utf8.find(item_name, auto_storage_blocklist_entries[i]:lower(), 1, true)
+			if name_found then
+				return true
+			end
+		end
+		return false
+	else
+		for i=1, auto_storage_num_blocklist_entries do
+			local item_name = utf8.lower(GameTextGetTranslatedOrNot(item_name))
+			local name_found = utf8.find(item_name, auto_storage_blocklist_entries[i]:lower(), 1, true)
+			if name_found then
+				return false
+			end
+		end
+		return true
+	end
 end
 
 function wand_bag_has_space()
@@ -1091,7 +1132,7 @@ function OnWorldPreUpdate()
 		if wand_bag_has_space() then
 			for i, wand in ipairs(get_held_wands()) do
 				local item_comp = EntityGetFirstComponentIncludingDisabled(wand.entity_id, "ItemComponent")
-				if item_comp and wand.baggable and ComponentGetValue2(item_comp, "mFramePickedUp") == GameGetFrameNum() then
+				if item_comp and wand.baggable and ComponentGetValue2(item_comp, "mFramePickedUp") == GameGetFrameNum() and blocklist_check(item_comp) then
 					async(function()
 						put_wand_in_storage(wand.entity_id, active_wand_tab)
 					end)
@@ -1101,7 +1142,7 @@ function OnWorldPreUpdate()
 		if item_bag_has_space() then
 			for i, item in ipairs(get_held_items()) do
 				local item_comp = EntityGetFirstComponentIncludingDisabled(item.entity_id, "ItemComponent")
-				if item_comp and item.baggable and ComponentGetValue2(item_comp, "mFramePickedUp") == GameGetFrameNum() then
+				if item_comp and item.baggable and ComponentGetValue2(item_comp, "mFramePickedUp") == GameGetFrameNum() and blocklist_check(item_comp) then
 					async(function()
 						put_item_in_storage(item.entity_id, active_item_tab)
 					end)

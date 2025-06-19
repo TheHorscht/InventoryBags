@@ -1,3 +1,6 @@
+v0.11.0:
+- Add mod settings for a white/blacklist to define which items should not be automatically stored when auto-storage is on (based on item name).
+
 v0.10.0:
 - Add setting for automatically closing bags when opening inventory
 - Add setting to automatically store picked up wands/items

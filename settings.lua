@@ -131,6 +131,64 @@ mod_settings =
 		scope = MOD_SETTING_SCOPE_RUNTIME,
 	},
 	{
+		category_id = "auto_storage_blocklist",
+		ui_name = "Auto storage blocklist",
+		ui_description = "Define a blocklist for wands/items that should not be auto-stored (blacklist),\nor only those that should be auto-stored (whitelist).\n\nIt checks if the item name contains whatever you enter, case insensitive,\nfor example 'tablet' will match 'Emerald Tablet - Volume IX'",
+		foldable = true,
+		settings = {
+			{
+				id = "list_type",
+				ui_name = "List type",
+				ui_description = "Blacklist = These will not be auto-stored\nWhitelist = Only these will be auto-stored, not any others",
+				value_default = "blacklist",
+				values = { { "blacklist", "Blacklist" }, { "whitelist", "Whitelist" } },
+				scope = MOD_SETTING_SCOPE_RUNTIME,
+			},
+			{
+				scope = MOD_SETTING_SCOPE_RUNTIME,
+				ui_fn = function(mod_id, gui, in_main_menu, im_id, setting)
+					local id = 2
+					local function new_id()
+						id = id + 1
+						return id
+					end
+					local function get_setting_id(idx)
+						return mod_id .. "." .. "blocklist_entries." .. idx
+					end
+					GuiIdPush(gui, im_id)
+					GuiLayoutBeginVertical(gui, 0, 0)
+					local num_entries = ModSettingGetNextValue(mod_id .. "." .. "num_blocklist_entries") or 0
+					for i=1, num_entries do
+						GuiLayoutBeginHorizontal(gui, 5, 0, true)
+						local text = ModSettingGetNextValue(get_setting_id(i)) or ""
+						local new_text = GuiTextInput(gui, new_id(), 0, 0, tostring(text), 100, 100)
+						if text ~= new_text then
+							ModSettingSetNextValue(get_setting_id(i), new_text, false)
+						end
+						if GuiButton(gui, new_id(), 0, 0, "[ Remove entry ]") then
+							for i2=i, num_entries-1 do
+								local next_entry = ModSettingGetNextValue(get_setting_id(i2+1)) or ""
+								ModSettingSetNextValue(get_setting_id(i2), next_entry, false)
+							end
+							ModSettingRemove(get_setting_id(num_entries))
+							ModSettingSetNextValue(mod_id .. ".num_blocklist_entries", num_entries - 1, false)
+						end
+						GuiLayoutEnd(gui)
+					end
+					if GuiButton(gui, new_id(), 5, 0, "[ Add new entry ]") then
+						ModSettingSetNextValue(mod_id .. ".num_blocklist_entries", num_entries + 1, false)
+					end
+					GuiLayoutEnd(gui)
+					GuiIdPop(gui)
+					-- Add empty space to push the layout down because for some reason it's not working
+					for i=1, num_entries+1 do
+						GuiText(gui, 0, 0, " ")
+					end
+				end
+			},
+		}
+	},
+	{
 		category_id = "tab_labels",
 		ui_name = "Tab Labels",
 		ui_description = "Labels for the tabs when hovering over them.\nKeep the mouse hovered over these text fields to enter text.",
@@ -235,6 +293,15 @@ function ModSettingsUpdate(init_scope)
 		ModSettingSetNextValue("InventoryBags.num_tabs_items", old_num_tabs, true)
 	end
 	mod_settings_update(mod_id, mod_settings, init_scope)
+	-- Save the blocklist
+	local blocklist_type = ModSettingGetNextValue(mod_id .. ".list_type") or "blacklist"
+	ModSettingSet(mod_id .. ".list_type", blocklist_type)
+	local num_blocklist_entries = ModSettingGetNextValue(mod_id .. ".num_blocklist_entries") or 0
+	ModSettingSet(mod_id .. ".num_blocklist_entries", num_blocklist_entries)
+	for i=1, num_blocklist_entries do
+		local entry = ModSettingGetNextValue(mod_id .. ".blocklist_entries." .. tostring(i)) or ""
+		ModSettingSet(mod_id .. ".blocklist_entries." .. tostring(i), entry)
+	end
 end
 
 function ModSettingsGuiCount()
